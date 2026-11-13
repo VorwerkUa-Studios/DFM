@@ -1,9 +1,10 @@
 """
-Decod Headless MCP Server:
+Decod Headless MCP Server v2:
 Standard JSON-RPC 2.0 Model Context Protocol Server for Claude Code & Mnemosyne.
 Exposes cross-platform reverse engineering, memory dumping, DLL analysis, C decompilation,
 signature scanning, binary patching, 3D model tools, MIDI music composition,
-FFmpeg audio/video conversion, game localization, and multi-format game extraction tools to AI agents.
+FFmpeg audio/video conversion, game localization, multi-format game extraction,
+AI memory scanner (Cheat Engine), Offset Vault (SQLite), and UE4SS Lua modding tools.
 """
 
 import sys
@@ -25,7 +26,7 @@ from engines.ue5.ue_helper import UEHelper
 from engines.jvm.java_helper import JavaHelper
 from engines.electron.asar_helper import AsarUnpacker
 from engines.assets.model_helper import Model3DHelper
-from engines.assets.audio_helper import MidiComposer
+from engines.assets.audio_helper import compose_midi
 from engines.assets.localization_helper import LocalizationHelper
 from engines.assets.media_converter import MediaConverter
 from tools.decompiler.dll_analyzer import DLLAnalyzer
@@ -33,6 +34,10 @@ from tools.decompiler.headless_decompiler import HeadlessCDecompiler
 from tools.decompiler.demangler import demangle_symbol
 from tools.scanner.sig_scanner import SigScanner
 from tools.patcher.binary_patcher import BinaryPatcher
+from tools.scanner.memory_scanner import snapshot, diff_snapshot, read_memory_value, write_memory_value, quick_scan
+from tools.vault.offset_vault import add_offset, list_offsets, get_offset, delete_offset, rescan_offsets, import_offsets, export_vault
+from engines.ue5.ue4ss_helper import check_ue4ss, scaffold_mod, scaffold_map_editor, list_mods, enable_mod
+from engines.assets.audio_helper import compose_midi
 
 ue_helper = UEHelper()
 media_converter = MediaConverter()
@@ -399,6 +404,163 @@ TOOLS = [
             },
             "required": ["target"]
         }
+    },
+    # ── Memory Scanner (AI Cheat Engine) ──────────────────────────────────────
+    {
+        "name": "memory_snapshot",
+        "description": "Take a snapshot of a process's readable memory regions. First step of two-pass memory diff scanning (like Cheat Engine). Use to find health, ammo, coordinates etc.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pid": {"type": "integer", "description": "Target process ID."},
+                "value_type": {"type": "string", "description": "Data type to scan: u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 (default: u32)."}
+            },
+            "required": ["pid"]
+        }
+    },
+    {
+        "name": "memory_diff",
+        "description": "Compare a saved memory snapshot vs current live process memory to find addresses that changed to a specific value. Second step of two-pass memory scanning.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "snapshot_id": {"type": "string", "description": "Snapshot ID returned by memory_snapshot."},
+                "new_value": {"description": "Value the address should now contain (e.g. current health after taking damage)."},
+                "max_results": {"type": "integer", "description": "Max addresses to return (default 500)."}
+            },
+            "required": ["snapshot_id", "new_value"]
+        }
+    },
+    {
+        "name": "memory_read",
+        "description": "Read a single value from a process memory address (requires Frida attach).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pid": {"type": "integer"},
+                "address": {"type": "string", "description": "Hex address string (e.g. '0x7FF4A3B00')."},
+                "value_type": {"type": "string", "description": "u8/u16/u32/u64/f32/f64 etc."}
+            },
+            "required": ["pid", "address"]
+        }
+    },
+    {
+        "name": "memory_write",
+        "description": "Write a value to a process memory address (requires Frida attach). Use for game value manipulation.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pid": {"type": "integer"},
+                "address": {"type": "string", "description": "Hex address string."},
+                "value": {"description": "Value to write."},
+                "value_type": {"type": "string", "description": "u8/u16/u32/u64/f32/f64 etc."}
+            },
+            "required": ["pid", "address", "value"]
+        }
+    },
+    {
+        "name": "memory_quick_scan",
+        "description": "One-shot Frida memory scan for a known value. No snapshot needed. Use when you already know the exact current value (e.g. health=100).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pid": {"type": "integer"},
+                "value": {"description": "Value to find."},
+                "value_type": {"type": "string", "description": "u8/u16/u32/u64/f32/f64 (default: u32)."},
+                "max_results": {"type": "integer"}
+            },
+            "required": ["pid", "value"]
+        }
+    },
+    # ── Offset Vault ─────────────────────────────────────────────────────────
+    {
+        "name": "vault_add",
+        "description": "Save a function offset or AOB pattern to the persistent Offset Vault SQLite database. Offsets survive game patches via AOB re-scan.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game": {"type": "string", "description": "Game name (e.g. 'stalker2')."},
+                "name": {"type": "string", "description": "Offset name (e.g. 'TakeDamage', 'PlayerHealth')."},
+                "address_hex": {"type": "string", "description": "Current hex address (e.g. '0x14A2B3C00')."},
+                "aob_pattern": {"type": "string", "description": "AOB byte pattern for auto-rescan (e.g. '48 8B 05 ?? ?? ?? ?? 48 85 C0')."},
+                "module": {"type": "string", "description": "Module/DLL name."},
+                "version": {"type": "string", "description": "Game version string."},
+                "notes": {"type": "string"}
+            },
+            "required": ["game", "name"]
+        }
+    },
+    {
+        "name": "vault_list",
+        "description": "List all offsets in the Vault, optionally filtered by game name.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game": {"type": "string", "description": "Filter by game name (optional)."}
+            }
+        }
+    },
+    {
+        "name": "vault_rescan",
+        "description": "Re-scan a game binary for all stored AOB patterns and auto-update addresses after a game patch.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game": {"type": "string"},
+                "binary_path": {"type": "string", "description": "Path to game .exe or .dll to scan."}
+            },
+            "required": ["game", "binary_path"]
+        }
+    },
+    # ── UE4SS ────────────────────────────────────────────────────────────────
+    {
+        "name": "ue4ss_check",
+        "description": "Check if UE4SS is installed in a game directory and locate the Mods/ folder.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_dir": {"type": "string", "description": "Path to game root or Binaries/Win64 directory."}
+            },
+            "required": ["game_dir"]
+        }
+    },
+    {
+        "name": "ue4ss_scaffold_mod",
+        "description": "Generate a UE4SS Lua mod scaffold (main.lua + enabled.txt) ready to drop into Mods/ folder.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "output_dir": {"type": "string", "description": "Directory to create the mod folder in."},
+                "mod_name": {"type": "string", "description": "Mod folder/display name."},
+                "description": {"type": "string"},
+                "version": {"type": "string"}
+            },
+            "required": ["output_dir", "mod_name"]
+        }
+    },
+    {
+        "name": "ue4ss_map_editor",
+        "description": "Generate and optionally deploy the STALKER 2 Map & Object Editor UE4SS Lua mod with ImGui overlay, actor list, transform gizmo, crosshair teleport, and JSON persistence.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "output_dir": {"type": "string", "description": "Directory to output the mod files."},
+                "game_dir": {"type": "string", "description": "Game directory to auto-deploy into (optional)."},
+                "save_path": {"type": "string", "description": "JSON file to save object placements (optional)."}
+            },
+            "required": ["output_dir"]
+        }
+    },
+    {
+        "name": "ue4ss_list_mods",
+        "description": "List all UE4SS mods installed in a game directory, with enabled/disabled status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_dir": {"type": "string"}
+            },
+            "required": ["game_dir"]
+        }
     }
 ]
 
@@ -414,13 +576,13 @@ def handle_tool_call(name: str, args: dict) -> dict:
             return media_converter.inspect_media(args["file_path"])
 
         elif name == "compose_midi_music":
-            composer = MidiComposer(bpm=args["bpm"])
-            composer.set_tempo(args["bpm"])
-            inst = args.get("instrument", 0)
-            composer.set_instrument(inst)
-            composer.add_notes(args["notes"])
-            out = composer.save(args["output_path"])
-            return {"status": "success", "file": out, "bpm": args["bpm"], "note_count": len(args["notes"])}
+            return compose_midi(
+                output_path=args["output_path"],
+                bpm=args.get("bpm", 120),
+                tracks=args.get("tracks"),
+                preset=args.get("preset"),
+                seed=args.get("seed", 42),
+            )
 
         elif name == "inspect_3d_model":
             return Model3DHelper.inspect_obj(args["model_path"])
@@ -558,6 +720,51 @@ def handle_tool_call(name: str, args: dict) -> dict:
             runner = FridaRunner()
             pid = runner.attach(args["target"], enable_stealth=True)
             return {"status": "success", "pid": pid, "stealth": True}
+
+        # ── Memory Scanner ────────────────────────────────────────────────────
+        elif name == "memory_snapshot":
+            return snapshot(args["pid"], args.get("value_type", "u32"))
+
+        elif name == "memory_diff":
+            return diff_snapshot(args["snapshot_id"], args["new_value"], args.get("max_results", 500))
+
+        elif name == "memory_read":
+            return read_memory_value(args["pid"], args["address"], args.get("value_type", "u32"))
+
+        elif name == "memory_write":
+            return write_memory_value(args["pid"], args["address"], args["value"], args.get("value_type", "u32"))
+
+        elif name == "memory_quick_scan":
+            return quick_scan(args["pid"], args["value"], args.get("value_type", "u32"), args.get("max_results", 200))
+
+        # ── Offset Vault ──────────────────────────────────────────────────────
+        elif name == "vault_add":
+            return add_offset(
+                game=args["game"], name=args["name"],
+                address_hex=args.get("address_hex"), aob_pattern=args.get("aob_pattern"),
+                module=args.get("module"), version=args.get("version", "any"),
+                notes=args.get("notes"),
+            )
+
+        elif name == "vault_list":
+            return list_offsets(args.get("game"))
+
+        elif name == "vault_rescan":
+            return rescan_offsets(args["game"], args["binary_path"])
+
+        # ── UE4SS ─────────────────────────────────────────────────────────────
+        elif name == "ue4ss_check":
+            return check_ue4ss(args["game_dir"])
+
+        elif name == "ue4ss_scaffold_mod":
+            return scaffold_mod(args["output_dir"], args["mod_name"],
+                                args.get("description", "Custom mod"), args.get("version", "1.0.0"))
+
+        elif name == "ue4ss_map_editor":
+            return scaffold_map_editor(args["output_dir"], args.get("game_dir"), args.get("save_path"))
+
+        elif name == "ue4ss_list_mods":
+            return list_mods(args["game_dir"])
 
         else:
             return {"status": "error", "message": f"Unknown tool: {name}"}
