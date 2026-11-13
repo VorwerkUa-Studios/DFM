@@ -1,0 +1,22 @@
+{
+  "system": {
+    "version": "0.1.0",
+    "log_level": "INFO",
+    "workdir": "output"
+  },
+  "tools": {
+    "ghidra_path": "",
+    "rizin_path": "",
+    "repak_path": "",
+    "uesave_path": ""
+  },
+  "stealth": {
+    "auto_enable_linux_preload": true,
+    "frida_spoof_timing": true,
+    "frida_spoof_peb": true
+  },
+  "mcp": {
+    "name": "decod-re-engine",
+    "version": "1.0.0"
+  }
+}
