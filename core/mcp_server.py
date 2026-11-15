@@ -39,6 +39,7 @@ from tools.vault.offset_vault import add_offset, list_offsets, get_offset, delet
 from engines.ue5.ue4ss_helper import check_ue4ss, scaffold_mod, scaffold_map_editor, list_mods, enable_mod
 from engines.assets.audio_helper import compose_midi
 from tools.code.code_analyzer import inspect_code_structure, extract_function_definition, check_code_diagnostics, run_git_summary
+from tools.security.strix_pentester import run_situational_security_audit, check_strix_status
 
 ue_helper = UEHelper()
 media_converter = MediaConverter()
@@ -608,6 +609,28 @@ TOOLS = [
             },
             "required": ["repo_path"]
         }
+    },
+    # ── Security & Web Pentesting (Strix AI) ──────────────────────────
+    {
+        "name": "run_security_audit",
+        "description": "Situational web & backend security audit using usestrix/strix autonomous pentesting agent (if installed) or high-speed built-in SAST static analyzer. Scans for hardcoded API keys, JWT, private keys, SQL injection, RCE, CORS, and XSS.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {"type": "string", "description": "Local project path, source file, or URL to audit."},
+                "scan_mode": {"type": "string", "description": "Scan intensity: 'quick' (default) or 'deep'.", "default": "quick"},
+                "max_budget": {"type": "integer", "description": "Max budget in USD if using Strix LLM (default 5).", "default": 5}
+            },
+            "required": ["target"]
+        }
+    },
+    {
+        "name": "check_security_tools_status",
+        "description": "Check if Strix AI pentester CLI, Docker runtime, and SAST analyzers are installed and ready.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
     }
 ]
 
@@ -825,6 +848,17 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "run_git_summary":
             return run_git_summary(args["repo_path"])
+
+        # ── Security & Web Pentesting (Strix AI) ──────────────────────
+        elif name == "run_security_audit":
+            return run_situational_security_audit(
+                args["target"],
+                scan_mode=args.get("scan_mode", "quick"),
+                max_budget=args.get("max_budget", 5)
+            )
+
+        elif name == "check_security_tools_status":
+            return check_strix_status()
 
         else:
             return {"status": "error", "message": f"Unknown tool: {name}"}
