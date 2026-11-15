@@ -1,83 +1,91 @@
-# Decod — Universal Headless Reverse Engineering Engine
+# Decod — Universal Headless Reverse Engineering & Modding Engine
+# 🛠 Дзеркальний RE-рушій та MCP-сервер
 
-**Decod** — це кросплатформний (Windows / Linux) headless-інструментарій для зворотного інжинірингу, динамічного аналізу, дампу процесів, патчингу, конвертації медіа (FFmpeg) та розпакування ігрових асетів.
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
+[![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple.svg)](#)
+[![Tools](https://img.shields.io/badge/Tools-46%20Active-orange.svg)](#)
 
-Розроблений спеціально як бекенд та MCP-сервер для **[Mnemosyne](file:///C:/Users/knyaz/Desktop/Mnemosyne)** та агентів на базі **Claude Code / FreeLLMAPI**.
+[**Mnemosyne Desktop Host**](https://github.com/VorwerkUa2/Mnemosyne) | [**Посібник користувача**](https://github.com/VorwerkUa2/Mnemosyne/blob/main/SETUP_GUIDE.md)
 
 ---
 
-## Архітектура системи
+## Огляд
 
+**Decod (DFM)** — це кросплатформний (Windows / Linux) headless-інструментарій для зворотного інжинірингу, динамічного аналізу пам'яті, дампу процесів (Scylla), дизасемблювання, патчингу, конвертації медіа (FFmpeg), інструментів розробки та модингу Unreal Engine 5.
+
+Decod функціонує як незалежний **Model Context Protocol (MCP)** сервер через `stdio` (JSON-RPC 2.0) для підключення до **[Mnemosyne](https://github.com/VorwerkUa2/Mnemosyne)** та **Claude Code CLI**.
+
+---
+
+## Швидке встановлення залежностей
+
+Запустіть універсальний інсталятор:
+```bash
+python setup_decod.py --install-all
 ```
-       ┌────────────────────────────────────────────────────────┐
-       │             Mnemosyne (Rust Host Application)          │
-       │       Керує сесіями Claude Code через FreeLLMAPI       │
-       └───────────────────────────┬────────────────────────────┘
-                                   │ JSON-RPC (MCP)
-                                   ▼
-       ┌────────────────────────────────────────────────────────┐
-       │             Decod MCP Server (30 Інструментів)         │
-       └─────┬─────────────────────┼──────────────────────┬─────┘
-             │                     │                      │
-             ▼                     ▼                      ▼
-    [ ДИНАМІКА & СТЕЛС ]    [ СТАТИКА & ДЕКОМПІЛЯЦІЯ ]    [ АСЕТИ, МЕДІА & РУШІЇ ]
-    - Frida Runner (x86/64) - Headless C Decompiler       - FFmpeg Audio/Video
-    - Anti-Anti-Debug       - Capstone Disassembler       - MIDI Music Composer
-    - libstealth (Linux)    - LIEF Process Dumper (Scylla)- 3D Models (OBJ, Minecraft)
-    - Byte Patcher (.bak)   - SigScan & String Extractor  - Game Localization Helper
-                            - C++ / Rust Demangler        - UE5, Unity, Godot, Source
+Скрипт автоматично:
+- Встановить Python-пакети (`frida`, `lief`, `capstone`, `psutil`, `rich`, `pydantic`, `pyright`).
+- Перевірить або встановить `rust-analyzer` через `rustup`.
+- Завантажить портативні бінарники `repak` та `uesave` у `Decod/bin/`.
+- Збілдить бібліотеку захисту від анти-відлагодження `libstealth.so` на Linux.
+
+Перевірка статусу компонентів:
+```bash
+python setup_decod.py --status
 ```
 
 ---
 
-## Повний список інструментів MCP-сервера (30 інструментів)
+## Повний каталог 46 інструментів MCP
 
-### 1. Медіа, Музика та 3D-Моделі:
-* `convert_media_file(input, output)` — конвертація аудіо/відео через системний FFmpeg (OGG, WAV, MP3, MP4, WebM тощо).
-* `extract_audio_from_video(video, output_audio)` — витягування звукових доріжок із катсцен або трейлерів гри.
-* `inspect_media_file(file_path)` — перегляд бітрейту, кодеків, частоти дискретизації через ffprobe.
-* `compose_midi_music(bpm, instrument, notes, output_path)` — генерація повноцінних `.mid` файлів мелодій за нотами ШІ.
-* `inspect_3d_model(model_path)` — аналіз Wavefront OBJ файлів (вершини, полігони, матеріали, Bounding Box).
-* `create_minecraft_block_model(name, texture)` — створення валідних 3D JSON-моделей блоків для Minecraft.
+### 1. ⚡ Code Intelligence & Token Optimization (4 інструменти)
+- `inspect_code_structure(file_path)`: Regex AST аналіз класів, методів, функцій і типів для Rust, Python, C/C++, C#, Go, Lua. Дозволяє вивчити структуру файлу без зчитування тисяч рядків.
+- `extract_function_definition(file_path, symbol_name)`: Хірургічне вилучення тіла однієї функції за її іменем. Економить до 85% контексту.
+- `check_code_diagnostics(project_or_file)`: Запуск миттєвої перевірки компілятором (`cargo check`, `py_compile`, `pyright`).
+- `run_git_summary(repo_path)`: Компактне резюме стану гілки, змінених файлів та diffstat без зайвих токенів.
 
-### 2. Локалізація та Переклад ігор:
-* `extract_game_strings(file_path)` — витягування текстових рядків із мовних файлів гри (JSON/CSV).
-* `save_game_translation(translated_dict, output_path)` — збереження перекладених текстів у формат гри (наприклад, `uk_ua.json`).
+### 2. 🔍 Статичний аналіз, Дизасемблювання та Декомпіляція (7 інструментів)
+- `decompile_function_to_c(binary_path, function_or_address)`: Відновлення C-псевдокоду функцій із аналізом змінних та викликів.
+- `disassemble_dll_function(dll_path, function_or_address)`: Покроковий асемблерний аналіз x86/x64 інструкцій через Capstone.
+- `inspect_dll(dll_path)`: Детальний розбір заголовків PE/ELF, архітектури, таблиць імпорту/експорту та CLR.
+- `patch_binary_bytes(file_path, offset, hex_bytes)`: Безпечний байт-патчинг бінарників з автоматичним бекапом (`.bak`).
+- `demangle_cpp_symbol(symbol)`: Відновлення зашифрованих C++ та Rust імен функцій у читабельний вигляд.
+- `search_binary_strings(binary_path, query)`: Пошук ASCII та Unicode UTF-16 рядків із прив'язкою до офсетів і RVA.
+- `scan_aob_pattern(binary_path, pattern)`: Пошук сигнатур Array of Bytes із масками `??` для знаходження функцій після оновлень ігор.
 
-### 3. Декомпіляція, Дизасемблювання та Патчинг:
-* `decompile_function_to_c(binary_path, function_or_address)` — відновлює C-псевдокод функцій зі змінними та циклами.
-* `disassemble_dll_function(dll_path, function_or_address)` — покроковий розбір машинного коду на асемблер через Capstone.
-* `inspect_dll(dll_path)` — аналіз архітектури (x86/x64), експорту, імпорту та .NET CLR заголовків.
-* `patch_binary_bytes(file_path, offset, hex_bytes)` — безпечний патчинг бінарників з автоматичним створенням `.bak`.
-* `demangle_cpp_symbol(symbol)` — відновлює зашифровані C++ / Rust імена функцій у читабельні сигнатури.
+### 3. 🧠 Динаміка, Пам'ять та Frida Hooking (6 інструментів)
+- `inject_frida_script(target_process, script_code)`: Динамічне впровадження хуків у пам'ять процесу в реальному часі.
+- `trace_function_calls(target_process, function_pattern)`: Трасування викликів нативних функцій процесу з аргументами.
+- `dump_process_memory_scylla(process_name_or_pid, output_path)`: Повний дамп образу процесу з пам'яті з відновленням таблиць секцій та IAT.
+- `scan_process_pattern(process_name_or_pid, aob_pattern)`: Пошук сигнатур безпосередньо у віртуальній пам'яті запущеного процесу.
+- `read_process_memory_slice(process_name_or_pid, address, size)`: Безпечне читання зрізу віртуальної пам'яті.
+- `write_process_memory_slice(process_name_or_pid, address, hex_data)`: Запис даних у пам'ять процесу.
 
-### 4. Пошук сигнатур та Рядків:
-* `search_binary_strings(binary_path, query)` — миттєвий пошук ASCII та Unicode UTF-16 рядків із прив'язкою до офсетів та RVA.
-* `scan_aob_pattern(binary_path, pattern)` — пошук сигнатур Array of Bytes з масками `??` для знаходження функцій після оновлень ігор.
+### 4. 🎮 Unreal Engine 5 Модинг та Асети (5 інструментів)
+- `detect_game_engine(game_dir)`: Автоматичне визначення рушія гри (UE5, Unity, Godot, Source).
+- `unpack_ue_pak(pak_path, output_dir, aes_key)`: Розпакування ігрових контейнерів UE5 PAK (через `repak`).
+- `pack_ue_pak(input_dir, output_pak, version, aes_key)`: Створення нових PAK-модів для ігор.
+- `unpack_ue_utoc(utoc_path, output_dir, aes_key)`: Робота з IoStore контейнерами UE5 (UTOC / UCAS).
+- `read_ue_savefile(sav_path)` / `patch_ue_savefile(...)`: Десеріалізація та редагування збережень UE5 (через `uesave`).
 
-### 5. Ігрові рушії та Формати:
-* `detect_game_engine(game_dir)` — автоматичне визначення рушія (UE5, Unity, Godot, Source, Spore).
-* `unpack_ue_pak(pak_path, output_dir, aes_key)` — розпакування архівів S.T.A.L.K.E.R. 2 / UE5 (через `repak.exe`).
-* `list_ue_pak(pak_path, aes_key)` — перегляд списку файлів у паку без розпакування.
-* `convert_ue_save_to_json(sav_path, json_out_path)` — конвертація сейвів UE5 у JSON (через `uesave.exe`).
-* `convert_json_to_ue_save(json_in_path, sav_out_path)` — збірка модифікованого JSON назад у `.sav`.
-* `unpack_jar_package(jar_path, output_dir)` — розпакування Java JAR/APK (Minecraft, моди, Android).
-* `read_minecraft_nbt(nbt_path)` — парсинг збережень світів, чанків та гравців Minecraft у JSON.
-* `unpack_electron_asar(asar_path, output_dir)` — витягування 100% вихідного коду (JS/HTML/CSS) з Discord, VS Code, Obsidian.
-* `unpack_godot_pck(pck_path, output_dir)` — розпакування пакетів Godot Engine 3/4.
-* `unpack_source_vpk(vpk_path, output_dir)` — розпакування Valve Source VPK (Half-Life, Portal, CS).
-* `unpack_dbpf_package(package_path, output_dir)` — розпакування архівів Spore та The Sims.
-* `inspect_unity_game(game_dir)` — діагностика Unity (Mono vs IL2CPP).
+### 5. 🎵 Мультимедіа, FFmpeg та 3D Моделі (6 інструментів)
+- `convert_media_file(input, output)`: Конвертація аудіо/відео файлів через системний FFmpeg (OGG, WAV, MP3, MP4, WebM тощо).
+- `extract_audio_from_video(video, output_audio)`: Витягування аудіодоріжок із відеофайлів.
+- `inspect_media_file(file_path)`: Аналіз бітрейту, кодеків та параметрів через `ffprobe`.
+- `compose_midi_music(bpm, instrument, notes, output_path)`: Програмна композиція повноцінних `.mid` файлів.
+- `inspect_3d_model(model_path)`: Аналіз геометрії Wavefront OBJ 3D-моделей (вершини, полігони, матеріали).
+- `create_minecraft_block_model(name, texture)`: Генерація валідних JSON-моделей блоків для Minecraft.
 
-### 6. Динаміка та Пам'ять:
-* `dump_process(pid, output_path)` — зняття дампу пам'яті та реконструкція заголовків бінарника (LIEF).
-* `inject_frida_stealth(target)` — інжекція Frida з анти-анти-дебагом.
-* `list_processes(filter_name)` — огляд запущених процесів системи.
+### 6. 🌐 Локалізація та Переклад (2 інструменти)
+- `extract_game_strings(file_path)`: Парсинг локалізаційних рядків із мовних файлів ігор (JSON/CSV).
+- `save_game_translation(translated_dict, output_path)`: Збереження перекладених рядків у цільовий мовний файл.
 
 ---
 
-## Встановлення залежностей
+## Запуск MCP-сервера напряму
 
 ```bash
-pip install -r requirements.txt
+python core/mcp_server.py
 ```
+Сервер починає обробку JSON-RPC 2.0 запитів через `stdin/stdout`.
