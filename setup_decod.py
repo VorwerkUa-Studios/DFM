@@ -26,7 +26,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 os.makedirs(BIN_DIR, exist_ok=True)
 
-PYTHON_PACKAGES = ["frida", "lief", "capstone", "psutil", "rich", "pydantic"]
+PYTHON_PACKAGES = ["frida", "lief", "capstone", "psutil", "rich", "pydantic", "pyright"]
 
 GITHUB_RELEASES = {
     "repak": {
@@ -101,7 +101,10 @@ def check_status() -> Dict[str, Any]:
     sys_status = {
         "ffmpeg": shutil.which("ffmpeg") is not None,
         "ffprobe": shutil.which("ffprobe") is not None,
-        "gcc": shutil.which("gcc") is not None
+        "gcc": shutil.which("gcc") is not None,
+        "rust_analyzer": shutil.which("rust-analyzer") is not None,
+        "clangd": shutil.which("clangd") is not None,
+        "pyright": shutil.which("pyright") is not None or "pyright" in py_status and py_status["pyright"],
     }
 
     # 4. Linux stealth library
@@ -114,9 +117,18 @@ def check_status() -> Dict[str, Any]:
         "arch": platform.machine(),
         "components": {
             "python_deps": {
-                "name": "Python Reverse Engineering Packages",
+                "name": "Python Reverse Engineering & Analysis Packages",
                 "installed": all(py_status.values()),
                 "details": py_status
+            },
+            "code_intelligence": {
+                "name": "LSP & Code Intelligence (rust-analyzer, clangd, pyright)",
+                "installed": sys_status["pyright"] or sys_status["rust_analyzer"],
+                "details": {
+                    "rust_analyzer": sys_status["rust_analyzer"],
+                    "clangd": sys_status["clangd"],
+                    "pyright": sys_status["pyright"],
+                }
             },
             "ue5_tools": {
                 "name": "Unreal Engine 5 Modding Tools (repak, uesave)",
@@ -140,6 +152,16 @@ def install_python_deps():
     print("[*] Installing Python packages...")
     cmd = [sys.executable, "-m", "pip", "install"] + PYTHON_PACKAGES
     subprocess.check_call(cmd)
+
+def install_lsp_tools():
+    """Install or enable language server components if tooling exists."""
+    if shutil.which("rustup") and not shutil.which("rust-analyzer"):
+        print("[*] Installing rust-analyzer via rustup...")
+        try:
+            subprocess.run(["rustup", "component", "add", "rust-analyzer"], check=True)
+            print("[+] rust-analyzer installed.")
+        except Exception as e:
+            print(f"[-] Could not install rust-analyzer via rustup: {e}")
 
 def install_ue5_tools():
     """Download portable binaries for repak and uesave into Decod/bin."""
@@ -201,6 +223,7 @@ def main():
     if "--install-all" in sys.argv:
         print(f"[*] Starting Decod Setup for {detect_distro()}...")
         install_python_deps()
+        install_lsp_tools()
         install_ue5_tools()
         if platform.system() != "Windows":
             build_linux_stealth()
