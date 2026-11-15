@@ -38,6 +38,7 @@ from tools.scanner.memory_scanner import snapshot, diff_snapshot, read_memory_va
 from tools.vault.offset_vault import add_offset, list_offsets, get_offset, delete_offset, rescan_offsets, import_offsets, export_vault
 from engines.ue5.ue4ss_helper import check_ue4ss, scaffold_mod, scaffold_map_editor, list_mods, enable_mod
 from engines.assets.audio_helper import compose_midi
+from tools.code.code_analyzer import inspect_code_structure, extract_function_definition, check_code_diagnostics, run_git_summary
 
 ue_helper = UEHelper()
 media_converter = MediaConverter()
@@ -561,6 +562,52 @@ TOOLS = [
             },
             "required": ["game_dir"]
         }
+    },
+    # ── Code Intelligence & Diagnostics (Token Saver) ─────────────────────────
+    {
+        "name": "inspect_code_structure",
+        "description": "Fast AST outline of a code file (Rust, Python, C/C++, C#, Lua). Returns list of functions, classes, structs, and line numbers without reading thousands of lines.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Path to source file."}
+            },
+            "required": ["file_path"]
+        }
+    },
+    {
+        "name": "extract_function_definition",
+        "description": "Extract ONLY the implementation body of a specific function or class by name from a file. Saves 90%+ tokens.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Path to source file."},
+                "symbol_name": {"type": "string", "description": "Name of function or class to extract."}
+            },
+            "required": ["file_path", "symbol_name"]
+        }
+    },
+    {
+        "name": "check_code_diagnostics",
+        "description": "Run compiler checks or linters (cargo check for Rust, py_compile for Python) to verify syntax without full builds.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path to project directory, Cargo.toml, or source file."}
+            },
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "run_git_summary",
+        "description": "Get a token-compact git summary: branch, modified/untracked files, and diff stat.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Path to git repository root."}
+            },
+            "required": ["repo_path"]
+        }
     }
 ]
 
@@ -765,6 +812,19 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "ue4ss_list_mods":
             return list_mods(args["game_dir"])
+
+        # ── Code Intelligence & Diagnostics ──────────────────────────────────
+        elif name == "inspect_code_structure":
+            return inspect_code_structure(args["file_path"])
+
+        elif name == "extract_function_definition":
+            return extract_function_definition(args["file_path"], args["symbol_name"])
+
+        elif name == "check_code_diagnostics":
+            return check_code_diagnostics(args["path"])
+
+        elif name == "run_git_summary":
+            return run_git_summary(args["repo_path"])
 
         else:
             return {"status": "error", "message": f"Unknown tool: {name}"}
