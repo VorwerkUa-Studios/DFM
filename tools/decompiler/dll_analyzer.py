@@ -38,12 +38,24 @@ class DLLAnalyzer:
     def get_summary(self) -> Dict[str, Any]:
         """Returns structured metadata about the DLL / shared library."""
         exports = []
-        if self.is_pe and hasattr(self.binary, "exported_functions"):
+        if self.is_pe and hasattr(self.binary, "get_export"):
+            try:
+                exp_table = self.binary.get_export()
+                if exp_table and hasattr(exp_table, "entries"):
+                    for exp in exp_table.entries:
+                        exports.append({
+                            "name": getattr(exp, "name", "") or f"Ordinal_{getattr(exp, 'ordinal', 0)}",
+                            "address": hex(getattr(exp, "address", 0)),
+                            "ordinal": getattr(exp, "ordinal", None)
+                        })
+            except Exception:
+                pass
+        if not exports and hasattr(self.binary, "exported_functions"):
             for exp in self.binary.exported_functions:
                 exports.append({
-                    "name": exp.name or f"Ordinal_{exp.ordinal}",
-                    "address": hex(exp.address),
-                    "ordinal": exp.ordinal
+                    "name": getattr(exp, "name", "") or "unnamed",
+                    "address": hex(getattr(exp, "address", 0)),
+                    "ordinal": getattr(exp, "ordinal", None)
                 })
         elif self.is_elf and hasattr(self.binary, "exported_symbols"):
             for sym in self.binary.exported_symbols:
@@ -55,9 +67,9 @@ class DLLAnalyzer:
         imports = {}
         if self.is_pe and hasattr(self.binary, "imports"):
             for imp in self.binary.imports:
-                imports[imp.name] = [entry.name or f"Ordinal_{entry.data}" for entry in imp.entries[:20]]
+                imports[imp.name] = [getattr(entry, "name", "") or f"Ordinal_{getattr(entry, 'data', 0)}" for entry in list(imp.entries)[:20]]
         elif self.is_elf and hasattr(self.binary, "imported_symbols"):
-            imports["dynamic_symbols"] = [s.name for s in self.binary.imported_symbols[:50]]
+            imports["dynamic_symbols"] = [getattr(s, "name", "") for s in list(self.binary.imported_symbols)[:50]]
 
         sections = []
         for s in self.binary.sections:
@@ -101,7 +113,11 @@ class DLLAnalyzer:
 
         if target_rva is None:
             try:
-                target_rva = int(target_address_or_name, 16) if target_address_or_name.startswith("0x") else int(target_address_or_name)
+                val = int(target_address_or_name, 16) if target_address_or_name.startswith("0x") else int(target_address_or_name)
+                if hasattr(self.binary, "imagebase") and val >= self.binary.imagebase:
+                    target_rva = val - self.binary.imagebase
+                else:
+                    target_rva = val
             except ValueError:
                 raise ValueError(f"Could not resolve function name or address: {target_address_or_name}")
 
