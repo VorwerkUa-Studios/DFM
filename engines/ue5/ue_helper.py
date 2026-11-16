@@ -49,8 +49,8 @@ class UEHelper:
             "output_pak": output_pak
         }
 
-    def list_pak(self, pak_path: str, aes_key: str = None) -> Dict[str, Any]:
-        """List files inside a UE .pak archive without unpacking."""
+    def list_pak(self, pak_path: str, aes_key: str = None, filter_query: str = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """List files inside a UE .pak archive without unpacking, with filtering and pagination."""
         if not os.path.exists(pak_path):
             raise FileNotFoundError(f"PAK archive not found: {pak_path}")
 
@@ -59,10 +59,34 @@ class UEHelper:
             cmd.extend(["--aes-key", aes_key])
 
         result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            }
+
+        all_lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if filter_query:
+            q = filter_query.lower()
+            matched = [line for line in all_lines if q in line.lower()]
+        else:
+            matched = all_lines
+
+        total_matched = len(matched)
+        page = matched[offset : offset + limit]
+
         return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr
+            "success": True,
+            "total_files_in_pak": len(all_lines),
+            "filter_query": filter_query,
+            "matched_count": total_matched,
+            "offset": offset,
+            "limit": limit,
+            "showing_count": len(page),
+            "files": page,
+            "has_more": (offset + len(page)) < total_matched,
+            "notice": f"Displaying {len(page)} of {total_matched} matches. Use 'filter_query', 'offset', and 'limit' to browse more." if total_matched > limit else "All matching files displayed."
         }
 
     def convert_save_to_json(self, sav_path: str, json_out_path: str) -> Dict[str, Any]:

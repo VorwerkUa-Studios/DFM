@@ -22,3 +22,7 @@ Thumbs.db
 
 # Binaries downloaded via setup_decod.py
 bin/
+
+# Reverse engineering scratch files
+scratch_*.py
+apply_patches.py

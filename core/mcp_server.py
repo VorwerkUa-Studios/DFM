@@ -293,12 +293,15 @@ TOOLS = [
     },
     {
         "name": "list_ue_pak",
-        "description": "List files inside a UE4/UE5 .pak archive without extracting them.",
+        "description": "List files inside a UE4/UE5 .pak archive without extracting them. Supports substring filtering and pagination to avoid blowing up context.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "pak_path": {"type": "string", "description": "Path to the .pak file."},
-                "aes_key": {"type": "string", "description": "Optional AES key."}
+                "aes_key": {"type": "string", "description": "Optional AES key."},
+                "filter_query": {"type": "string", "description": "Optional substring to filter paths (case-insensitive, e.g. '.uasset', 'ZoneTerra', 'Maps')."},
+                "limit": {"type": "integer", "description": "Max entries to return (default 100, max 500)."},
+                "offset": {"type": "integer", "description": "Starting index for pagination (default 0)."}
             },
             "required": ["pak_path"]
         }
@@ -720,7 +723,13 @@ def handle_tool_call(name: str, args: dict) -> dict:
             return ue_helper.unpack_pak(args["pak_path"], args["output_dir"], args.get("aes_key"))
 
         elif name == "list_ue_pak":
-            return ue_helper.list_pak(args["pak_path"], args.get("aes_key"))
+            return ue_helper.list_pak(
+                args["pak_path"],
+                aes_key=args.get("aes_key"),
+                filter_query=args.get("filter_query"),
+                limit=min(int(args.get("limit", 100)), 500),
+                offset=int(args.get("offset", 0))
+            )
 
         elif name == "convert_ue_save_to_json":
             return ue_helper.convert_save_to_json(args["sav_path"], args["json_out_path"])
@@ -866,6 +875,18 @@ def handle_tool_call(name: str, args: dict) -> dict:
     except Exception as e:
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
 
+MAX_TOOL_OUTPUT_CHARS = 16000
+
+def truncate_tool_output(output_str: str, max_chars: int = MAX_TOOL_OUTPUT_CHARS) -> str:
+    """Truncate tool output if it exceeds max_chars to prevent context window explosion."""
+    if len(output_str) <= max_chars:
+        return output_str
+    omitted = len(output_str) - max_chars
+    return (
+        output_str[:max_chars]
+        + f"\n\n... [OUTPUT TRUNCATED: {omitted} characters (~{omitted // 4} tokens) omitted by Decod MCP to prevent context overflow. Refine query, add filters, or paginate to view more.] ..."
+    )
+
 def main():
     """Main JSON-RPC stdio loop for Model Context Protocol."""
     for line in sys.stdin:
@@ -913,7 +934,7 @@ def main():
                         "content": [
                             {
                                 "type": "text",
-                                "text": json.dumps(res, indent=2)
+                                "text": truncate_tool_output(json.dumps(res, indent=2))
                             }
                         ]
                     }
