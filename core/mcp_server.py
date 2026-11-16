@@ -31,6 +31,8 @@ from engines.assets.localization_helper import LocalizationHelper
 from engines.assets.media_converter import MediaConverter
 from tools.decompiler.dll_analyzer import DLLAnalyzer
 from tools.decompiler.headless_decompiler import HeadlessCDecompiler
+from tools.decompiler.crypto_detector import CryptoDetector
+from tools.decompiler.project_decompiler import ProjectDecompiler
 from tools.decompiler.demangler import demangle_symbol
 from tools.scanner.sig_scanner import SigScanner
 from tools.patcher.binary_patcher import BinaryPatcher
@@ -230,6 +232,30 @@ TOOLS = [
                 "max_instructions": {"type": "integer", "description": "Maximum instructions to disassemble (default 50)."}
             },
             "required": ["dll_path", "function_or_address"]
+        }
+    },
+    {
+        "name": "analyze_binary_crypto",
+        "description": "Scan any binary (.dll, .exe, .addon64, .so, assets) to detect all cryptographic algorithms (AES, DES, RC4, TEA/XTEA, Blowfish, MD5, SHA-1, SHA-256, SHA-512, CRC32, Adler32, Base64), Windows Crypto APIs (BCrypt, CryptoAPI), compression (Oodle, Zlib, LZ4, ZSTD), and anti-tamper protections.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Absolute path to binary file (.dll, .exe, .addon64)."}
+            },
+            "required": ["binary_path"]
+        }
+    },
+    {
+        "name": "deconstruct_binary_project",
+        "description": "Deconstruct any native binary into a complete, structured C/C++ project with decompiled feature logic, class headers, anti-tamper neutralization, and CMake/build templates.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Path to binary file (.dll, .exe, .addon64)."},
+                "output_dir": {"type": "string", "description": "Output project directory."},
+                "max_decompiled_functions": {"type": "integer", "description": "Max functions to decompile (default 50)."}
+            },
+            "required": ["binary_path", "output_dir"]
         }
     },
     {
@@ -704,6 +730,14 @@ def handle_tool_call(name: str, args: dict) -> dict:
             analyzer = DLLAnalyzer(args["dll_path"])
             max_insn = args.get("max_instructions", 50)
             return analyzer.disassemble_function(args["function_or_address"], max_insn)
+
+        elif name == "analyze_binary_crypto":
+            return CryptoDetector.scan_file(args["binary_path"])
+
+        elif name == "deconstruct_binary_project":
+            dec = ProjectDecompiler(args["binary_path"])
+            max_fn = args.get("max_decompiled_functions", 50)
+            return dec.deconstruct_to_project(args["output_dir"], max_fn)
 
         elif name == "unpack_jar_package":
             return JavaHelper.unpack_jar(args["jar_path"], args["output_dir"])
