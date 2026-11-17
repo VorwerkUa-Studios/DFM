@@ -33,6 +33,7 @@ from tools.decompiler.dll_analyzer import DLLAnalyzer
 from tools.decompiler.headless_decompiler import HeadlessCDecompiler
 from tools.decompiler.crypto_detector import CryptoDetector
 from tools.decompiler.project_decompiler import ProjectDecompiler
+from tools.decompiler.decompile_full_binary import deconstruct_entire_binary
 from tools.decompiler.demangler import demangle_symbol
 from tools.scanner.sig_scanner import SigScanner
 from tools.patcher.binary_patcher import BinaryPatcher
@@ -254,6 +255,19 @@ TOOLS = [
                 "binary_path": {"type": "string", "description": "Path to binary file (.dll, .exe, .addon64)."},
                 "output_dir": {"type": "string", "description": "Output project directory."},
                 "max_decompiled_functions": {"type": "integer", "description": "Max functions to decompile (default 50)."}
+            },
+            "required": ["binary_path", "output_dir"]
+        }
+    },
+    {
+        "name": "decompile_entire_binary",
+        "description": "Exhaustively decompile 100% of instructions and all registered functions in any native binary (.dll, .exe, .addon64) into full C++ modules, extracted string tables, universal types.h, and a ready-to-build CMake project.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Path to binary file (.dll, .exe, .addon64)."},
+                "output_dir": {"type": "string", "description": "Destination directory for the complete C++ project."},
+                "chunk_size": {"type": "integer", "description": "Number of functions per translation unit module (default 500)."}
             },
             "required": ["binary_path", "output_dir"]
         }
@@ -738,6 +752,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
             dec = ProjectDecompiler(args["binary_path"])
             max_fn = args.get("max_decompiled_functions", 50)
             return dec.deconstruct_to_project(args["output_dir"], max_fn)
+
+        elif name == "decompile_entire_binary":
+            chunk_size = args.get("chunk_size", 500)
+            return deconstruct_entire_binary(args["binary_path"], args["output_dir"], chunk_size=chunk_size)
 
         elif name == "unpack_jar_package":
             return JavaHelper.unpack_jar(args["jar_path"], args["output_dir"])
