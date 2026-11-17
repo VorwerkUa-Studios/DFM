@@ -19,6 +19,7 @@ if BASE_DIR not in sys.path:
 import lief
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CS_MODE_32
 from tools.decompiler.crypto_detector import CryptoDetector
+from tools.decompiler.ast_decompiler import ASTDecompiler
 
 class ProjectDecompiler:
     def __init__(self, binary_path: str):
@@ -102,7 +103,7 @@ class ProjectDecompiler:
         return functions
 
     def decompile_function_to_c(self, begin_rva: int, end_rva: int, known_strings: Dict[int, str] = None) -> str:
-        """Decompiles assembly of target function into structured C pseudocode with string annotations."""
+        """Decompiles assembly of target function into structured C++ code using ASTDecompiler."""
         text_sec = self.binary.get_section(".text")
         if not text_sec:
             return "// No .text section found"
@@ -119,62 +120,16 @@ class ProjectDecompiler:
         cs = Cs(CS_ARCH_X86, CS_MODE_64 if self.is_64bit else CS_MODE_32)
         fn_bytes = text_raw[offset_start:offset_end]
 
-        c_lines = []
-        c_lines.append(f"// Function RVA: 0x{begin_rva:08X} - 0x{end_rva:08X} (Size: {end_rva - begin_rva} bytes)")
-        c_lines.append(f"__int64 fn_sub_{begin_rva:08X}(void* rcx_arg, __int64 rdx_arg, __int64 r8_arg, __int64 r9_arg) {{")
+        insns = []
+        for insn in cs.disasm(fn_bytes, self.image_base + begin_rva):
+            insns.append((insn.address - self.image_base, insn.mnemonic, insn.op_str))
 
-        indent = "    "
-        for insn in cs.disasm(fn_bytes, begin_rva):
-            addr = insn.address
-            mnem = insn.mnemonic
-            ops = insn.op_str
+        ast_dec = ASTDecompiler(image_base=self.image_base, is_64bit=self.is_64bit)
+        if known_strings:
+            ast_dec.set_strings(known_strings)
 
-            # Check for RIP-relative string references
-            annot = ""
-            if "rip +" in ops:
-                try:
-                    rel_match = re.search(r"rip \+ 0x([0-9a-fA-F]+)", ops)
-                    if rel_match:
-                        rel_val = int(rel_match.group(1), 16)
-                        target_rva = addr + insn.size + rel_val
-                        if known_strings and target_rva in known_strings:
-                            annot = f' /* String: "{known_strings[target_rva]}" */'
-                except:
-                    pass
-
-            if mnem in ["push", "pop"]:
-                continue
-            elif mnem == "mov":
-                c_lines.append(f"{indent}{ops.replace(',', ' =')};{annot}")
-            elif mnem == "xor" and ops.split(",")[0].strip() == ops.split(",")[1].strip():
-                c_lines.append(f"{indent}{ops.split(',')[0].strip()} = 0;{annot}")
-            elif mnem in ["add", "sub"]:
-                op_sign = "+=" if mnem == "add" else "-="
-                parts = [x.strip() for x in ops.split(",", 1)]
-                c_lines.append(f"{indent}{parts[0]} {op_sign} {parts[1]};{annot}")
-            elif mnem in ["cmp", "test"]:
-                c_lines.append(f"{indent}// Check: {ops}{annot}")
-            elif mnem in ["je", "jz"]:
-                c_lines.append(f"{indent}if (condition_zero) goto loc_{ops.replace('0x', '')};")
-            elif mnem in ["jne", "jnz"]:
-                c_lines.append(f"{indent}if (!condition_zero) goto loc_{ops.replace('0x', '')};")
-            elif mnem in ["ja", "jg"]:
-                c_lines.append(f"{indent}if (condition_greater) goto loc_{ops.replace('0x', '')};")
-            elif mnem in ["jb", "jl"]:
-                c_lines.append(f"{indent}if (condition_less) goto loc_{ops.replace('0x', '')};")
-            elif mnem == "jmp":
-                c_lines.append(f"{indent}goto loc_{ops.replace('0x', '')};")
-            elif mnem == "call":
-                c_lines.append(f"{indent}fn_call_{ops.replace('0x', '')}();{annot}")
-            elif mnem in ["ret", "retn"]:
-                c_lines.append(f"{indent}return rax;")
-            else:
-                c_lines.append(f"{indent}__asm__(\"{mnem} {ops}\");{annot}")
-
-        if not any("return" in l for l in c_lines):
-            c_lines.append(f"{indent}return 0;")
-        c_lines.append("}\n")
-        return "\n".join(c_lines)
+        cfg = ast_dec.build_cfg(insns)
+        return ast_dec.decompile_cfg_to_c(f"fn_sub_{begin_rva:08X}", cfg)
 
     def deconstruct_to_project(self, output_dir: str, max_decompiled_functions: int = 50) -> Dict[str, Any]:
         """Deconstructs the full binary into a complete, organized C/C++ project directory."""
@@ -230,12 +185,11 @@ class ProjectDecompiler:
 // Neutralizes internal binary checksum verification so custom modifications work seamlessly.
 
 extern "C" NTSTATUS WINAPI Hooked_BCryptFinishHash(
-    BCRYPTHASHHANDLE hHash,
+    BCRYPT_HASH_HANDLE hHash,
     PUCHAR pbOutput,
     ULONG cbOutput,
     ULONG dwFlags
 ) {
-    // Fill hash buffer with valid dummy bytes to satisfy verification logic
     if (pbOutput && cbOutput > 0) {
         memset(pbOutput, 0xAA, cbOutput);
     }
@@ -243,7 +197,7 @@ extern "C" NTSTATUS WINAPI Hooked_BCryptFinishHash(
 }
 
 extern "C" NTSTATUS WINAPI Hooked_BCryptHashData(
-    BCRYPTHASHHANDLE hHash,
+    BCRYPT_HASH_HANDLE hHash,
     PUCHAR pbInput,
     ULONG cbInput,
     ULONG dwFlags
