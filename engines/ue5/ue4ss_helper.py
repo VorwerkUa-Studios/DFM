@@ -37,11 +37,6 @@ local version  = "{version}"
 
 -- ── Hooks ────────────────────────────────────────────────────────────────────
 
-RegisterHook("/Script/Engine.PlayerController:ClientRestart", function(ctx)
-    print("[" .. mod_name .. "] Player spawned. Mod active.")
-    -- Your initialization code here
-end)
-
 -- ── Main Loop (runs every frame if ImGui is active) ──────────────────────────
 
 local show_window = true
@@ -87,18 +82,18 @@ end
 
 local function load_placements()
     local file = io.open(save_path, "r")
-    if not file then return {{}} end
+    if not file then return {} end
     local content = file:read("*all")
     file:close()
-    return json.decode(content) or {{}}
+    return json.decode(content) or {}
 end
 
 -- ── Actor helpers ─────────────────────────────────────────────────────────────
 
 local function get_all_actors()
     local world = GetWorld()
-    if not world then return {{}} end
-    local actors = {{}}
+    if not world then return {} end
+    local actors = {}
     world:ForEachActor(function(actor)
         local name = actor:GetName()
         if search_query == "" or name:lower():find(search_query:lower()) then
@@ -112,15 +107,72 @@ local function get_actor_transform(actor)
     local loc = actor:K2_GetActorLocation()
     local rot = actor:K2_GetActorRotation()
     local scl = actor:GetActorScale3D()
-    return {{
+    return {
         x = loc.X, y = loc.Y, z = loc.Z,
         pitch = rot.Pitch, yaw = rot.Yaw, roll = rot.Roll,
         sx = scl.X, sy = scl.Y, sz = scl.Z,
-    }}
+    }
+end
+
+local function get_safe_actor_class(actor)
+    local ok, actor_class = pcall(function()
+        return actor:GetClass():GetName()
+    end)
+    return ok and actor_class or "Unknown"
+end
+
+local function get_safe_full_name(actor)
+    local ok, full_name = pcall(function()
+        return actor:GetFullName()
+    end)
+    return ok and full_name or actor:GetName()
+end
+
+local function dump_world()
+    local world = GetWorld()
+    if not world then
+        print("[MapEditor] World unavailable")
+        return 0
+    end
+
+    local dumped = {
+        format = "decod-ue-world-v1",
+        generated_by = "Decod UE4SS MapEditor",
+        units = {uu_per_meter = 100.0, minecraft_scale_hint = "1 block per meter"},
+        actors = {},
+    }
+
+    world:ForEachActor(function(actor)
+        local ok, name = pcall(function() return actor:GetName() end)
+        if not ok or not name then return end
+
+        local transform_ok, transform = pcall(function()
+            return get_actor_transform(actor)
+        end)
+        if not transform_ok then return end
+
+        table.insert(dumped.actors, {
+            name = name,
+            full_name = get_safe_full_name(actor),
+            class_name = get_safe_actor_class(actor),
+            transform = transform,
+        })
+    end)
+
+    local dump_path = "C:\\\\Users\\\\knyaz\\\\Desktop\\\\Decod\\\\output\\\\stalker_world_dump.json"
+    local file = io.open(dump_path, "w")
+    if file then
+        file:write(json.encode(dumped))
+        file:close()
+        print("[MapEditor] Dumped " .. #dumped.actors .. " actors to " .. dump_path)
+    else
+        print("[MapEditor] Could not write " .. dump_path)
+    end
+    return #dumped.actors
 end
 
 local function set_actor_location(actor, x, y, z)
-    actor:K2_SetActorLocation({{X=x, Y=y, Z=z}}, false, {{}}, false)
+    actor:K2_SetActorLocation({X=x, Y=y, Z=z}, false, {}, false)
 end
 
 local function teleport_to_crosshair(actor)
@@ -165,6 +217,10 @@ RegisterHook("/Script/Engine.HUD:ReceiveDrawHUD", function(ctx)
     if ImGui.Button("Refresh List") then
         actor_list = get_all_actors()
     end
+    ImGui.SameLine()
+    if ImGui.Button("Dump Full World") then
+        dump_world()
+    end
 
     ImGui.Separator()
 
@@ -200,11 +256,11 @@ RegisterHook("/Script/Engine.HUD:ReceiveDrawHUD", function(ctx)
         ImGui.Separator()
         if ImGui.Button("Save Placement") then
             local placements = load_placements()
-            table.insert(placements, {{
+            table.insert(placements, {
                 name   = selected_actor:GetName(),
                 class  = selected_actor:GetClass():GetName(),
                 transform = get_actor_transform(selected_actor),
-            }})
+            })
             save_placements(placements)
         end
     end
@@ -220,9 +276,120 @@ RegisterConsoleCommandHandler("mapedit", function(args)
     return true
 end)
 
+RegisterConsoleCommandHandler("dumpworld", function(args)
+    dump_world()
+    return true
+end)
+
+RegisterConsoleCommandHandler("dumpworldassets", function(args)
+    dump_world()
+    local builtin_dumps = {
+        "DumpAllActors",
+        "DumpStaticMeshes",
+        "DumpUSMAP",
+        "DumpJMAP",
+    }
+    for _, function_name in ipairs(builtin_dumps) do
+        local ok, dump_function = pcall(function()
+            return _G[function_name]
+        end)
+        if ok and type(dump_function) == "function" then
+            local dumped, result = pcall(dump_function)
+            if dumped then
+                print("[MapEditor] " .. function_name .. " completed")
+            else
+                print("[MapEditor] " .. function_name .. " failed: " .. tostring(result))
+            end
+        else
+            print("[MapEditor] " .. function_name .. " is unavailable")
+        end
+    end
+    return true
+end)
+
+RegisterConsoleCommandHandler("dumpusmap", function(args)
+    local ok, dump_function = pcall(function()
+        return _G["DumpUSMAP"]
+    end)
+    if not ok or type(dump_function) ~= "function" then
+        print("[MapEditor] DumpUSMAP is unavailable")
+        return true
+    end
+
+    local dumped, result = pcall(dump_function)
+    if dumped then
+        print("[MapEditor] DumpUSMAP completed; check the UE4SS log for the output path")
+    else
+        print("[MapEditor] DumpUSMAP failed: " .. tostring(result))
+    end
+    return true
+end)
+
+RegisterConsoleCommandHandler("dumpbakedfoliage", function(args)
+    local names = {
+        "/Script/Landscape.HISMOrISMBakedFoliage",
+        "/Script/Landscape.FSubcomponentBakedFoliage",
+        "/Script/Landscape.FoliageTypeBakedFoliage",
+        "/Script/Landscape.FBakedFoliage",
+        "/Script/Landscape.CompressedTransformRanges",
+    }
+
+    local output = "C:\\\\Users\\\\knyaz\\\\Desktop\\\\Decod\\\\output\\\\stalker_baked_foliage_reflection.json"
+    local properties = {}
+
+    for _, full_name in ipairs(names) do
+        local struct = StaticFindObject(full_name)
+        if struct and struct:IsValid() then
+            local record = { name = full_name, properties = {} }
+            struct:ForEachProperty(function(property)
+                local prop_name = property:GetFName():ToString()
+                local prop_class = property:GetClass():GetFName():ToString()
+                local prop_record = {
+                    name = prop_name,
+                    class_name = prop_class,
+                    offset = property:GetOffset_Internal(),
+                }
+
+                if PropertyTypes.ArrayProperty and property:IsA(PropertyTypes.ArrayProperty) then
+                    local inner = property:GetInner()
+                    prop_record.inner_class = inner:GetClass():GetFName():ToString()
+                    prop_record.inner_name = inner:GetFName():ToString()
+                    if inner:IsA(PropertyTypes.StructProperty) then
+                        prop_record.inner_struct = inner:GetStruct():GetFullName()
+                    elseif inner:IsA(PropertyTypes.EnumProperty) then
+                        prop_record.inner_enum = inner:GetEnum():GetFullName()
+                    end
+                elseif PropertyTypes.StructProperty and property:IsA(PropertyTypes.StructProperty) then
+                    prop_record.struct_name = property:GetStruct():GetFullName()
+                elseif PropertyTypes.EnumProperty and property:IsA(PropertyTypes.EnumProperty) then
+                    prop_record.enum_name = property:GetEnum():GetFullName()
+                elseif PropertyTypes.ObjectProperty and property:IsA(PropertyTypes.ObjectProperty) then
+                    prop_record.object_class = property:GetPropertyClass():GetFullName()
+                elseif PropertyTypes.BoolProperty and property:IsA(PropertyTypes.BoolProperty) then
+                    prop_record.field_mask = property:GetFieldMask()
+                    prop_record.byte_mask = property:GetByteMask()
+                end
+
+                table.insert(record.properties, prop_record)
+            end)
+            table.insert(properties, record)
+        end
+    end
+
+    local file = io.open(output, "w")
+    if file then
+        file:write(json.encode(properties))
+        file:close()
+        print("[MapEditor] Wrote BakedFoliage reflection dump to " .. output)
+    else
+        print("[MapEditor] Could not write " .. output)
+    end
+    return true
+end)
+
 -- ── On load: restore saved placements ────────────────────────────────────────
 
-RegisterHook("/Script/Engine.GameInstance:Init", function(ctx)
+RegisterHook("/Script/Engine.PlayerController:ClientRestart", function(ctx)
     actor_list = get_all_actors()
     print("[MapEditor] Ready. Press ~ and type 'mapedit' to toggle UI.")
 end)
@@ -335,21 +502,38 @@ def scaffold_map_editor(
     }
 
     if game_dir:
-        # Try to find Mods directory
         gp = Path(game_dir)
         mod_destinations = [
+            gp / "Binaries" / "Win64" / "ue4ss" / "Mods",
             gp / "ue4ss" / "Mods",
             gp / "Binaries" / "Win64" / "Mods",
         ]
         dest = next((p for p in mod_destinations if p.exists()), None)
         if dest:
             deploy_path = dest / "MapEditor"
-            if deploy_path.exists():
-                shutil.rmtree(deploy_path)
-            shutil.copytree(str(out), str(deploy_path))
+            shutil.copytree(str(out), str(deploy_path), dirs_exist_ok=True)
+            load_order = dest / "mods.txt"
+            load_order_registered = False
+            if load_order.is_file():
+                lines = load_order.read_text(encoding="utf-8").splitlines()
+                has_entry = any(
+                    line.partition(":")[0].strip().casefold() == "mapeditor"
+                    for line in lines
+                    if ":" in line and not line.lstrip().startswith(";")
+                )
+                if not has_entry:
+                    marker = next(
+                        (index for index, line in enumerate(lines)
+                         if line.strip().startswith("; Add your mods above this line")),
+                        len(lines),
+                    )
+                    lines.insert(marker, "MapEditor : 1")
+                    load_order.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                load_order_registered = True
             result["deployed"] = True
             result["deploy_path"] = str(deploy_path)
-            result["hint"] = "Mod deployed! Launch game, open console with ~, type 'mapedit'"
+            result["load_order_registered"] = load_order_registered
+            result["hint"] = "Restart the game, open the UE4SS console with ~, and run 'dumpusmap'."
         else:
             result["hint"] = (
                 "Could not find Mods/ directory in game folder. "
@@ -363,6 +547,7 @@ def list_mods(game_dir: str) -> dict:
     """List all UE4SS mods in a game directory."""
     gp = Path(game_dir)
     mod_dirs = [
+        gp / "Binaries" / "Win64" / "ue4ss" / "Mods",
         gp / "ue4ss" / "Mods",
         gp / "Binaries" / "Win64" / "Mods",
     ]
@@ -389,6 +574,7 @@ def enable_mod(game_dir: str, mod_name: str, enable: bool = True) -> dict:
     """Enable or disable a UE4SS mod by creating/removing enabled.txt."""
     gp = Path(game_dir)
     mod_dirs = [
+        gp / "Binaries" / "Win64" / "ue4ss" / "Mods" / mod_name,
         gp / "ue4ss" / "Mods" / mod_name,
         gp / "Binaries" / "Win64" / "Mods" / mod_name,
     ]

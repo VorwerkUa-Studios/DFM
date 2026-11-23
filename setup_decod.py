@@ -20,11 +20,14 @@ import zipfile
 import tarfile
 import io
 import json
+import hashlib
 from typing import Dict, Any, List, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(BASE_DIR, "bin")
+COMPONENTS_DIR = os.path.join(BASE_DIR, "components")
 os.makedirs(BIN_DIR, exist_ok=True)
+os.makedirs(COMPONENTS_DIR, exist_ok=True)
 
 PYTHON_PACKAGES = ["frida", "lief", "capstone", "psutil", "rich", "pydantic", "pyright"]
 
@@ -43,6 +46,12 @@ GITHUB_RELEASES = {
         "linux_tar": "https://github.com/trumank/uesave/releases/download/v0.7.1/uesave_cli-x86_64-unknown-linux-gnu.tar.gz",
         "exe_name": "uesave.exe" if os.name == "nt" else "uesave"
     }
+}
+
+FMODEL_RELEASE = {
+    "tag": "nov-2026",
+    "url": "https://github.com/4sval/FModel/releases/download/nov-2026/FModel.zip",
+    "sha256": "209bef15402dd58010cdb6bad03a799471f2100d671f8d5a52c1e613549b7de1",
 }
 
 def detect_distro() -> str:
@@ -107,6 +116,13 @@ def check_status() -> Dict[str, Any]:
         "pyright": shutil.which("pyright") is not None or "pyright" in py_status and py_status["pyright"],
     }
 
+    fmodel_dir = os.path.join(COMPONENTS_DIR, "FModel")
+    fmodel_exe = os.path.join(fmodel_dir, "FModel.exe")
+    fmodel_status = os.path.exists(fmodel_exe)
+    cue4parse_project = os.path.join(BASE_DIR, "tools", "ue5", "cue4parse_cli", "Decod.Cue4Parse.csproj")
+    dotnet_path = shutil.which("dotnet")
+    oodle_path = os.path.join(BIN_DIR, "oo2core_9_win64.dll")
+
     # 4. Linux stealth library
     libstealth_path = os.path.join(BASE_DIR, "stealth", "linux", "libstealth.so")
     stealth_status = os.path.exists(libstealth_path) if platform.system() != "Windows" else True
@@ -134,6 +150,23 @@ def check_status() -> Dict[str, Any]:
                 "name": "Unreal Engine 5 Modding Tools (repak, uesave)",
                 "installed": all(ue_status.values()),
                 "details": ue_status
+            },
+            "fmodel": {
+                "name": "FModel Unreal Archive/IoStore Browser",
+                "installed": fmodel_status,
+                "details": {
+                    "executable": fmodel_exe,
+                    "platform": "windows-only",
+                }
+            },
+            "cue4parse": {
+                "name": "CUE4Parse headless Unreal PAK/IoStore scanner",
+                "installed": bool(dotnet_path and os.path.exists(cue4parse_project)),
+                "details": {
+                    "dotnet": dotnet_path,
+                    "project": cue4parse_project,
+                    "oodle_dll": oodle_path if os.path.exists(oodle_path) else None,
+                }
             },
             "media_tools": {
                 "name": "FFmpeg Multimedia Suite",
@@ -197,6 +230,36 @@ def install_ue5_tools():
                         os.chmod(target_path, 0o755)
                         print(f"[+] Extracted {target_path}")
 
+def install_fmodel():
+    """Download the official verified FModel Windows release for IoStore asset browsing."""
+    if platform.system() != "Windows":
+        print("[*] FModel is currently Windows-only; skipping.")
+        return
+
+    fmodel_dir = os.path.join(COMPONENTS_DIR, "FModel")
+    fmodel_exe = os.path.join(fmodel_dir, "FModel.exe")
+    if os.path.exists(fmodel_exe):
+        print(f"[+] FModel already present at {fmodel_exe}")
+        return
+
+    os.makedirs(fmodel_dir, exist_ok=True)
+    print(f"[*] Downloading official FModel {FMODEL_RELEASE['tag']}...")
+    req = urllib.request.Request(FMODEL_RELEASE["url"], headers={"User-Agent": "Decod-Installer"})
+    with urllib.request.urlopen(req) as resp:
+        content = resp.read()
+
+    digest = hashlib.sha256(content).hexdigest()
+    if digest.lower() != FMODEL_RELEASE["sha256"]:
+        raise RuntimeError(
+            f"FModel SHA-256 mismatch: expected {FMODEL_RELEASE['sha256']}, got {digest}"
+        )
+
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        archive.extractall(fmodel_dir)
+    if not os.path.exists(fmodel_exe):
+        raise RuntimeError(f"FModel archive did not contain {fmodel_exe}")
+    print(f"[+] Verified FModel installed at {fmodel_exe}")
+
 def build_linux_stealth():
     """Build libstealth.so on Linux using gcc."""
     if platform.system() == "Windows":
@@ -225,6 +288,7 @@ def main():
         install_python_deps()
         install_lsp_tools()
         install_ue5_tools()
+        install_fmodel()
         if platform.system() != "Windows":
             build_linux_stealth()
         print("\n[+] All Decod components successfully installed!")

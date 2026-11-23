@@ -40,6 +40,8 @@ from tools.patcher.binary_patcher import BinaryPatcher
 from tools.scanner.memory_scanner import snapshot, diff_snapshot, read_memory_value, write_memory_value, quick_scan
 from tools.vault.offset_vault import add_offset, list_offsets, get_offset, delete_offset, rescan_offsets, import_offsets, export_vault
 from engines.ue5.ue4ss_helper import check_ue4ss, scaffold_mod, scaffold_map_editor, list_mods, enable_mod
+from engines.ue5.world_converter import WorldConverter
+from engines.ue5.cue4parse_helper import scan_ue_iostore_assets
 from engines.assets.audio_helper import compose_midi
 from tools.code.code_analyzer import inspect_code_structure, extract_function_definition, check_code_diagnostics, run_git_summary
 from tools.security.strix_pentester import run_situational_security_audit, check_strix_status
@@ -267,7 +269,8 @@ TOOLS = [
             "properties": {
                 "binary_path": {"type": "string", "description": "Path to binary file (.dll, .exe, .addon64)."},
                 "output_dir": {"type": "string", "description": "Destination directory for the complete C++ project."},
-                "chunk_size": {"type": "integer", "description": "Number of functions per translation unit module (default 500)."}
+                "chunk_size": {"type": "integer", "description": "Number of functions per translation unit module (default 500)."},
+                "domain_cluster": {"type": "boolean", "description": "Cluster decompiled functions into architectural domain modules (core, editor, storage, gui, engine, runtime)."}
             },
             "required": ["binary_path", "output_dir"]
         }
@@ -557,6 +560,115 @@ TOOLS = [
             "required": ["game", "binary_path"]
         }
     },
+    # ── World Transfer ───────────────────────────────────────────────────────
+    {
+        "name": "scan_ue_world_assets",
+        "description": "Scan an extracted UE5 directory or a PAK/IoStore archive name for maps, WorldPartition data, landscape, mesh, and material assets.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "description": "Directory or archive path to scan."},
+                "filter_query": {"type": "string", "description": "Optional location or asset name filter."}
+            },
+            "required": ["source"]
+        }
+    },
+    {
+        "name": "create_stalker_world_export_job",
+        "description": "Create a STALKER 2 world-export job manifest from the local game installation. It inventories PAK/IoStore files and checks headless CUE4Parse/UE4SS availability.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_root": {"type": "string", "description": "STALKER 2 installation root."},
+                "output_dir": {"type": "string", "description": "Directory for the job manifest and exports."}
+            },
+            "required": ["game_root", "output_dir"]
+        }
+    },
+    {
+        "name": "scan_ue_iostore_assets",
+        "description": "Index Unreal Engine PAK/IoStore package paths without a GUI using CUE4Parse. Optionally parse one package and list its exports; AES key and .usmap mappings can be supplied through DECOD_CUE4PARSE_AES_KEY and DECOD_CUE4PARSE_USMAP environment variables.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_root": {"type": "string", "description": "Game root or its Content/Paks directory."},
+                "output_path": {"type": "string", "description": "JSON output path for the package index."},
+                "filter_query": {"type": "string", "description": "Optional case-insensitive package-path filter.", "default": ""},
+                "max_results": {"type": "integer", "description": "Maximum package paths written to the index.", "default": 2000},
+                "game_version": {"type": "string", "description": "CUE4Parse EGame enum name.", "default": "GAME_UE5_5"},
+                "probe_asset": {"type": "string", "description": "Optional package path to parse and list exports."},
+                "package_type": {"type": "string", "enum": ["all", "maps", "assets"], "description": "Restrict results to .umap maps or .uasset assets.", "default": "all"},
+                "extract_dir": {"type": "string", "description": "Optional output directory for the raw package and available .uexp/.ubulk companions."}
+            },
+            "required": ["game_root", "output_path"]
+        }
+    },
+    {
+        "name": "export_heightmap_minecraft",
+        "description": "Convert a JSON or CSV height grid into an executable Minecraft mcfunction file. Useful for reproducing an extracted STALKER or Unreal terrain footprint.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "heightmap_path": {"type": "string", "description": "JSON or CSV numeric height grid."},
+                "output_path": {"type": "string", "description": "Output .mcfunction path."},
+                "base_block": {"type": "string", "description": "Block below the surface.", "default": "minecraft:stone"},
+                "surface_block": {"type": "string", "description": "Top-surface block.", "default": "minecraft:grass_block"},
+                "z_scale": {"type": "integer", "description": "Minecraft Z spacing per source row.", "default": 1},
+                "x_origin": {"type": "integer", "default": 0},
+                "y_origin": {"type": "integer", "default": 64},
+                "z_origin": {"type": "integer", "default": 0},
+                "vertical_offset": {"type": "integer", "default": 0},
+                "png_height_scale": {"type": "number", "description": "Scale applied only to PNG grayscale heights.", "default": 0.25}
+            },
+            "required": ["heightmap_path", "output_path"]
+        }
+    },
+    {
+        "name": "export_landscape_heightmap_from_probe",
+        "description": "Reconstruct a raw UE Landscape uint16 height grid from a CUE4Parse probe report and extracted .ubulk payload.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "probe_report_path": {"type": "string", "description": "CUE4Parse probe JSON created with --probe and --extract-dir."},
+                "output_path": {"type": "string", "description": "Output JSON path for the reconstructed height grid."},
+                "bulk_path": {"type": "string", "description": "Optional .ubulk path if it is not listed in the probe report.", "default": ""}
+            },
+            "required": ["probe_report_path", "output_path"]
+        }
+    },
+    {
+        "name": "export_voxel_manifest_minecraft",
+        "description": "Convert a JSON voxel manifest with x/y/z and block fields into a Minecraft mcfunction. Supports palette color-to-block mapping.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "manifest_path": {"type": "string", "description": "JSON file containing voxels or a voxels array."},
+                "output_path": {"type": "string", "description": "Output .mcfunction path."},
+                "x_origin": {"type": "integer", "default": 0},
+                "y_origin": {"type": "integer", "default": 64},
+                "z_origin": {"type": "integer", "default": 0}
+            },
+            "required": ["manifest_path", "output_path"]
+        }
+    },
+    {
+        "name": "export_ue_actor_dump_minecraft",
+        "description": "Convert a UE4SS MapEditor world dump into a Minecraft voxel manifest and optional mcfunction. Tree-like actors become approximate vanilla log-and-leaf trees, and other vegetation uses vanilla plant blocks; building geometry still requires mesh export.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dump_path": {"type": "string", "description": "Decod UE4SS stalker_world_dump.json file."},
+                "output_path": {"type": "string", "description": "Output .mcfunction path."},
+                "x_origin": {"type": "integer", "default": 0},
+                "y_origin": {"type": "integer", "default": 64},
+                "z_origin": {"type": "integer", "default": 0},
+                "uu_per_meter": {"type": "number", "default": 100.0},
+                "blocks_per_meter": {"type": "number", "default": 1.0},
+                "manifest_only": {"type": "boolean", "default": False}
+            },
+            "required": ["dump_path", "output_path"]
+        }
+    },
     # ── UE4SS ────────────────────────────────────────────────────────────────
     {
         "name": "ue4ss_check",
@@ -755,13 +867,80 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "decompile_entire_binary":
             chunk_size = args.get("chunk_size", 500)
-            return deconstruct_entire_binary(args["binary_path"], args["output_dir"], chunk_size=chunk_size)
+            domain_cluster = args.get("domain_cluster", False)
+            return deconstruct_entire_binary(args["binary_path"], args["output_dir"], chunk_size=chunk_size, domain_cluster=domain_cluster)
 
         elif name == "unpack_jar_package":
             return JavaHelper.unpack_jar(args["jar_path"], args["output_dir"])
 
         elif name == "read_minecraft_nbt":
             return JavaHelper.parse_minecraft_nbt(args["nbt_path"])
+
+        elif name == "scan_ue_world_assets":
+            return WorldConverter.scan_level_assets(
+                args["source"],
+                args.get("filter_query", ""),
+            )
+
+        elif name == "create_stalker_world_export_job":
+            return WorldConverter.create_stalker_world_export_job(
+                args["game_root"],
+                args["output_dir"],
+            )
+
+        elif name == "scan_ue_iostore_assets":
+            return scan_ue_iostore_assets(
+                args["game_root"],
+                args["output_path"],
+                filter_query=args.get("filter_query", ""),
+                max_results=int(args.get("max_results", 2000)),
+                game_version=args.get("game_version", "GAME_UE5_5"),
+                probe_asset=args.get("probe_asset", ""),
+                package_type=args.get("package_type", "all"),
+                extract_dir=args.get("extract_dir", ""),
+            )
+
+        elif name == "export_heightmap_minecraft":
+            return WorldConverter.export_heightmap_mcfunction(
+                args["heightmap_path"],
+                args["output_path"],
+                base_block=args.get("base_block", "minecraft:stone"),
+                surface_block=args.get("surface_block", "minecraft:grass_block"),
+                z_scale=int(args.get("z_scale", 1)),
+                x_origin=int(args.get("x_origin", 0)),
+                y_origin=int(args.get("y_origin", 64)),
+                z_origin=int(args.get("z_origin", 0)),
+                vertical_offset=int(args.get("vertical_offset", 0)),
+                png_height_scale=float(args.get("png_height_scale", 0.25)),
+            )
+
+        elif name == "export_landscape_heightmap_from_probe":
+            return WorldConverter.export_landscape_heightmap_from_probe(
+                args["probe_report_path"],
+                args["output_path"],
+                bulk_path=args.get("bulk_path", ""),
+            )
+
+        elif name == "export_voxel_manifest_minecraft":
+            return WorldConverter.export_voxel_manifest_mcfunction(
+                args["manifest_path"],
+                args["output_path"],
+                x_origin=int(args.get("x_origin", 0)),
+                y_origin=int(args.get("y_origin", 64)),
+                z_origin=int(args.get("z_origin", 0)),
+            )
+
+        elif name == "export_ue_actor_dump_minecraft":
+            return WorldConverter.export_ue_actor_dump_minecraft(
+                args["dump_path"],
+                args["output_path"],
+                x_origin=int(args.get("x_origin", 0)),
+                y_origin=int(args.get("y_origin", 64)),
+                z_origin=int(args.get("z_origin", 0)),
+                uu_per_meter=float(args.get("uu_per_meter", 100.0)),
+                blocks_per_meter=float(args.get("blocks_per_meter", 1.0)),
+                manifest_only=bool(args.get("manifest_only", False)),
+            )
 
         elif name == "unpack_electron_asar":
             unpacker = AsarUnpacker(args["asar_path"])

@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple.svg)](#)
-[![Tools](https://img.shields.io/badge/Tools-46%20Active-orange.svg)](#)
+[![Tools](https://img.shields.io/badge/Tools-57%20Active-orange.svg)](#)
 
 [**Mnemosyne Desktop Host**](https://github.com/VorwerkUa2/Mnemosyne) | [**Повний посібник / Complete Guide**](https://github.com/VorwerkUa2/Mnemosyne/blob/main/SETUP_GUIDE.md)
 
@@ -37,7 +37,7 @@ python setup_decod.py --status
 
 ---
 
-### 🛠 Повний каталог 46 інструментів MCP
+### 🛠 Повний каталог 57 інструментів MCP
 
 #### 1. ⚡ Code Intelligence та Економія токенів (4 інструменти)
 - `inspect_code_structure(file_path)`: Regex AST аналіз класів, методів, функцій і типів для Rust, Python, C/C++, C#, Go, Lua. Дозволяє вивчити структуру файлу без зчитування тисяч рядків.
@@ -45,7 +45,8 @@ python setup_decod.py --status
 - `check_code_diagnostics(project_or_file)`: Запуск миттєвої перевірки компілятором (`cargo check`, `py_compile`, `pyright`).
 - `run_git_summary(repo_path)`: Компактне резюме стану гілки, змінених файлів та diffstat без зайвих токенів.
 
-#### 2. 🔍 Статичний аналіз, Дизасемблювання та Декомпіляція (7 інструментів)
+#### 2. 🔍 Статичний аналіз, Дизасемблювання та Декомпіляція (8 інструментів)
+- `decompile_entire_binary(binary_path, output_dir, chunk_size, domain_cluster)`: Повна нативна реконструкція 100% функцій бінарника у збілювальний C++20 проєкт із AST-структуруванням без gotos, семантичним ліфтером (CRT, STL, Win32, Game Gates) та розподілом за доменами (`core`, `editor`, `storage`, `gui`, `engine`, `runtime`).
 - `decompile_function_to_c(binary_path, function_or_address)`: Відновлення C-псевдокоду функцій із аналізом змінних та викликів.
 - `disassemble_dll_function(dll_path, function_or_address)`: Покроковий асемблерний аналіз x86/x64 інструкцій через Capstone.
 - `inspect_dll(dll_path)`: Детальний розбір заголовків PE/ELF/Mach-O, архітектури, таблиць імпорту/експорту та CLR.
@@ -81,6 +82,22 @@ python setup_decod.py --status
 - `extract_game_strings(file_path)`: Парсинг локалізаційних рядків із мовних файлів ігор (JSON/CSV).
 - `save_game_translation(translated_dict, output_path)`: Збереження перекладених рядків у цільовий мовний файл.
 
+#### 7. 🗺 Перенесення UE5-світів у Minecraft
+- `ue4ss_map_editor(output_dir, game_dir, save_path)`: Створює й розгортає UE4SS-мап-редактор для STALKER 2. У грі команда `dumpworld` експортує завантажені actor-и, `dumpusmap` створює mappings, а `dumpworldassets` запускає повний набір UE4SS dump-функцій.
+- `scan_ue_iostore_assets(game_root, output_path, ...)`: Headless-індексація PAK/IoStore через CUE4Parse, без FModel. Опційно перевіряє один пакет і вивантажує його `.uasset/.umap` та знайдені `.uexp/.ubulk` файли.
+- CLI-приклад: `python decod.py ue-iostore-scan "<папка Stalker2>" "output\\stalker_maps.json" --package-type maps --filter Lesser --limit 5000`.
+- Для перевірки пакета додайте `--probe "Stalker2/Content/.../AssetName" --extract-dir "output\\raw_assets"`. У JSON є перелік exports та `export_details` з властивостями Landscape-компонентів, акторів і StaticMesh-компонентів, включно з доступними native-даними. Статус `raw_only` означає, що байти ассета прочитані, але CUE4Parse не зміг десеріалізувати пакет; у JSON буде причина.
+- Для поточної версії STALKER 2 (UE 5.5) сканер використовує профіль `GAME_UE5_5`. У CUE4Parse 1.2.2 профіль `GAME_Stalker2` відповідає старішій версії рушія. Щоб створити mappings, запустіть гру з UE4SS, відкрийте консоль (`~`) і виконайте `dumpusmap`. Сканер автоматично підхоплює найновіший `.usmap` із папки гри, `Binaries\\Win64` або `Binaries\\Win64\\ue4ss`; власний шлях задається через `DECOD_CUE4PARSE_USMAP`.
+- UE4SS створює USMAP v4, тоді як пакет CUE4Parse для .NET 8 читає до v3. Сканер перетворює v4 у тимчасову сумісну копію; явні числові значення enum у цій копії не зберігаються, оригінал не змінюється.
+- Сканер потребує .NET 8 SDK; при першому запуску .NET відновить NuGet-залежність CUE4Parse. Oodle DLL шукається в `Decod\\bin` або в `Binaries\\Win64`. AES-ключ за потреби задається через `DECOD_CUE4PARSE_AES_KEY`.
+- Для пакетного експорту рельєфу використайте `python decod.py world-cell-export "<гра>" "<індекс клітинок.json>" "<вихід>" --layer Terrain --min-x <x1> --max-x <x2> --min-y <y1> --max-y <y2>`, а потім `python decod.py landscape-heightmap-export "<вихід>\\batch-index.json.probes" "<heightmap.json>"`. Зшивання перевіряє краї тайлів і світові координати; результат містить сітку сирих 16-бітних висот UE.
+- `world-cell-export` пакетно розбирає один шар `Terrain`, `Architecture`, `Props`, `TreesEnv`, `BakedFoliageGrid`, `BakedFoliageGridNonDistantTrees` або `MainGrid` у прямокутнику координат World Partition. Координати різні для кожного шару; включаються також пакети з суфіксом Data Layer. Команда зберігає окремий звіт і raw payload для кожного пакета; `partial_package_count` показує пакети з помилками деталей, а `export_detail_error_count` — кількість таких помилок. Аномалії та об'єкти з особливою поведінкою залишаємо поза статичним переносом і позначаємо для майбутнього Minecraft-мода.
+- CLI `python decod.py world-job "<папка Stalker2>" "<папка виводу>"`: Створює JSON job з інвентарем PAK/IoStore та наявністю інструментів; це підготовка експорту, а не повний конвертер карти.
+- `scan_ue_world_assets(source, filter_query)`: Шукає `.umap`, WorldPartition, landscape, meshes і materials у розпакованій папці або назвах архіву.
+- `export_heightmap_minecraft(heightmap_path, output_path)`: Перетворює JSON/CSV/PNG heightmap у виконуваний Minecraft `.mcfunction`.
+- `export_voxel_manifest_minecraft(manifest_path, output_path)`: Перетворює voxel-манифест із координатами й ID блоків у `.mcfunction`.
+- `export_ue_actor_dump_minecraft(dump_path, output_path)`: Конвертує UE4SS actor dump у Minecraft manifest і `.mcfunction` з налаштованими origin/масштабом. Дерева замінюються приблизними ванільними силуетами зі стовбурів і листя Minecraft (порода визначається за назвою), інші рослини — ванільними блоками. Dump містить лише завантажені в грі actor-и та їхні трансформи; він не експортує геометрію будівель або повний ландшафт.
+
 ---
 
 ## 🇬🇧 English Version
@@ -108,7 +125,7 @@ python setup_decod.py --status
 
 ---
 
-### 🛠 Complete 46 MCP Tools Catalog
+### 🛠 Complete 57 MCP Tools Catalog
 
 #### 1. ⚡ Code Intelligence & Token Optimization (4 tools)
 - `inspect_code_structure(file_path)`: Regex AST symbol outline (classes, methods, functions, types) for Rust, Python, C/C++, C#, Go, Lua without reading entire thousand-line files into model context.
@@ -151,6 +168,22 @@ python setup_decod.py --status
 #### 6. 🌐 Game Localization (2 tools)
 - `extract_game_strings(file_path)`: Parses localization strings from game text files (JSON/CSV).
 - `save_game_translation(translated_dict, output_path)`: Saves translated strings into game-compatible formats.
+
+#### 7. 🗺 UE5 World to Minecraft Transfer
+- `ue4ss_map_editor(output_dir, game_dir, save_path)`: Generates and optionally deploys a STALKER 2 UE4SS world exporter. In-game, `dumpworld` exports loaded actors, `dumpusmap` generates mappings, and `dumpworldassets` invokes the full UE4SS dump set.
+- `scan_ue_iostore_assets(game_root, output_path, ...)`: Headlessly indexes PAK/IoStore assets through CUE4Parse without FModel. It can optionally probe one package and extract its `.uasset/.umap` plus available `.uexp/.ubulk` payloads.
+- CLI example: `python decod.py ue-iostore-scan "<Stalker2 folder>" "output\\stalker_maps.json" --package-type maps --filter Lesser --limit 5000`.
+- To probe a package, add `--probe "Stalker2/Content/.../AssetName" --extract-dir "output\\raw_assets"`. The JSON includes the export list and `export_details` for Landscape components, actors, and StaticMesh components, including available native data. `raw_only` means CUE4Parse read the asset bytes but could not deserialize the package; the JSON includes the reason.
+- For the current STALKER 2 build (UE 5.5), the scanner uses `GAME_UE5_5`. In CUE4Parse 1.2.2, the `GAME_Stalker2` profile corresponds to an older engine version. To generate mappings, launch the game with UE4SS, open its console (`~`), and run `dumpusmap`. The scanner auto-detects the newest `.usmap` in the game root, `Binaries\\Win64`, or `Binaries\\Win64\\ue4ss`; set `DECOD_CUE4PARSE_USMAP` to override discovery.
+- UE4SS generates USMAP v4 while the .NET 8 CUE4Parse package supports up to v3. The scanner converts v4 to a temporary compatible copy; explicit numeric enum values are omitted from that copy and the original remains unchanged.
+- The scanner requires the .NET 8 SDK; the first run restores the CUE4Parse NuGet dependency. Oodle is searched in `Decod\\bin` and the game's `Binaries\\Win64`. Set `DECOD_CUE4PARSE_AES_KEY` if an AES key is required.
+- To batch-export terrain, run `python decod.py world-cell-export "<game>" "<cell-index.json>" "<output>" --layer Terrain --min-x <x1> --max-x <x2> --min-y <y1> --max-y <y2>`, then run `python decod.py landscape-heightmap-export "<output>\\batch-index.json.probes" "<heightmap.json>"`. Stitching checks tile seams and world coordinates; the result contains raw 16-bit UE heights.
+- `world-cell-export` batch-parses one World Partition layer (`Terrain`, `Architecture`, `Props`, `TreesEnv`, `BakedFoliageGrid`, `BakedFoliageGridNonDistantTrees`, or `MainGrid`) inside a grid-coordinate rectangle. Coordinates are layer-specific and Data Layer suffix variants are included. A separate report and raw payload are saved for every package; `partial_package_count` reports packages with export-detail errors, and `export_detail_error_count` reports the number of those errors. Anomalies and behavior-specific objects are excluded from static conversion and reserved for the future Minecraft mod.
+- CLI `python decod.py world-job "<Stalker2 folder>" "<output folder>"`: Creates a JSON job with PAK/IoStore inventory and tool availability; this prepares an export workflow but does not fully convert the map.
+- `scan_ue_world_assets(source, filter_query)`: Finds `.umap`, WorldPartition, landscape, mesh, and material assets in extracted directories or archive listings.
+- `export_heightmap_minecraft(heightmap_path, output_path)`: Converts JSON/CSV/PNG terrain height grids into executable Minecraft `.mcfunction` files.
+- `export_voxel_manifest_minecraft(manifest_path, output_path)`: Converts x/y/z voxel manifests and block palettes into `.mcfunction`.
+- `export_ue_actor_dump_minecraft(dump_path, output_path)`: Converts UE4SS actor dumps into Minecraft manifests and `.mcfunction` placements with configurable origin and scale. Trees are replaced by approximate vanilla Minecraft log-and-leaf shapes, with wood species inferred from the name; other plants use vanilla blocks. The dump covers only actors currently loaded in-game and their transforms; it does not export building geometry or the complete landscape.
 
 ---
 
