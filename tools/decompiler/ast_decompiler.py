@@ -475,10 +475,16 @@ class ASTDecompiler:
                         rva = val - self.image_base if val >= self.image_base else val
                         target_name = f"fn_sub_{rva:06X}"
                     if re.match(r"^fn_sub_[0-9a-fA-F]+$", target_name):
+                        # Direct named function call - safe as-is
                         stmts.append(f"result = {target_name}(this_or_arg1, arg2, arg3, 0);")
+                    elif re.match(r"^global_data_", target_name):
+                        # Named global (function pointer in global var)
+                        stmts.append(f"result = SafeFuncPtr({target_name})(this_or_arg1, arg2, arg3, 0);")
                     else:
+                        # Computed / indirect call - wrap full lifted operand in SafeFuncPtr
+                        # _lift_operand may already produce MEM_WORD(...) or similar expressions
                         target_op = self._lift_operand(ops)
-                        stmts.append(f"result = ((bool(*)(RegValue, RegValue, RegValue, RegValue))(void*)(uintptr_t)({target_op}))(this_or_arg1, arg2, arg3, 0);")
+                        stmts.append(f"result = SafeFuncPtr({target_op})(this_or_arg1, arg2, arg3, 0);")
 
                 elif mnem.startswith('movs'):
                     dst, src = [p.strip() for p in ops.split(',', 1)]
