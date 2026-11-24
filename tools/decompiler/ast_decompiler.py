@@ -586,8 +586,9 @@ class ASTDecompiler:
                 var = pos_offsets[off]
                 next_off = sorted_pos[idx_p + 1] if idx_p + 1 < len(sorted_pos) else off + 8
                 gap = next_off - off
-                if gap > 8:
-                    alloc_sz = min(max(gap, 16), 512)
+                addr_taken = bool(re.search(r"&" + var + r"\b", all_stmts_text))
+                if gap > 8 or addr_taken:
+                    alloc_sz = max(min(max(gap, 16), 4096), 0x400 if addr_taken else 16)
                     lines.append(f"{indent}alignas(16) uint8_t {var}_buf[{hex(alloc_sz)}] = {{0}};")
                     lines.append(f"{indent}RegValue& {var} = *(RegValue*)&{var}_buf[0];")
                 else:
@@ -595,7 +596,12 @@ class ASTDecompiler:
 
             for off in sorted(sub_offsets.keys()):
                 var = sub_offsets[off]
-                lines.append(f"{indent}RegValue {var} = 0;")
+                addr_taken = bool(re.search(r"&" + var + r"\b", all_stmts_text))
+                if addr_taken:
+                    lines.append(f"{indent}alignas(16) uint8_t {var}_buf[0x400] = {{0}};")
+                    lines.append(f"{indent}RegValue& {var} = *(RegValue*)&{var}_buf[0];")
+                else:
+                    lines.append(f"{indent}RegValue {var} = 0;")
 
         lines.append("")
 
