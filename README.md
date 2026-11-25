@@ -185,6 +185,10 @@ python setup_decod.py --status
 - `export_voxel_manifest_minecraft(manifest_path, output_path)`: Converts x/y/z voxel manifests and block palettes into `.mcfunction`.
 - `export_ue_actor_dump_minecraft(dump_path, output_path)`: Converts UE4SS actor dumps into Minecraft manifests and `.mcfunction` placements with configurable origin and scale. Trees are replaced by approximate vanilla Minecraft log-and-leaf shapes, with wood species inferred from the name; other plants use vanilla blocks. The dump covers only actors currently loaded in-game and their transforms; it does not export building geometry or the complete landscape.
 
+#### 8. 🎨 Dear ImGui Stack & ReShade Overlay Safety Lifter
+- Automated balance tracking for Dear ImGui `PushStyleColor` / `PopStyleColor` and `PushStyleVar` / `PopStyleVar` stacks in decompiled ASTs.
+- Structured Exception Handling (`__try / __except`) boundaries for dynamic Dear ImGui overlay render delegates (`ImGui::Begin`, `ImGui::End`) to eliminate rendering deadlocks and invisible assertion failures in fullscreen DirectX 12 games.
+
 ---
 
 ## 🚀 Running MCP Server Directly / Запуск сервера напряму
