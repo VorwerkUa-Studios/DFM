@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "libraries": [
+    {
+      "id": "wolvenkit",
+      "name": "WolvenKit",
+      "category": "archive_asset_tool",
+      "status": "active",
+      "license": "GPL-3.0",
+      "repository": "https://github.com/WolvenKit/WolvenKit",
+      "formats": [".archive", ".cr2w", ".app", ".inkatlas", ".inkwidget", ".inkanim", ".mesh", ".xbm", ".mi", ".mlsetup", ".morphtarget"],
+      "automation": "CLI and C# libraries",
+      "platform": ["windows", "linux-dotnet", "linux-wine"]
+    },
+    {
+      "id": "cyber-engine-tweaks",
+      "name": "Cyber Engine Tweaks",
+      "category": "lua_runtime",
+      "status": "active",
+      "license": "GPL-3.0",
+      "repository": "https://github.com/maximegmd/CyberEngineTweaks",
+      "formats": ["init.lua", "Modules/*.lua"],
+      "automation": "Runtime Lua API; MCP bridges can invoke supported CET APIs",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "red4ext",
+      "name": "RED4ext",
+      "category": "native_extender",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/wopss/RED4ext",
+      "formats": [".dll", ".cpp", ".h", ".toml"],
+      "automation": "Native C++ SDK; build and plugin file management",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "red4ext-sdk",
+      "name": "RED4ext.SDK",
+      "category": "native_sdk",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/wopss/RED4ext.SDK",
+      "formats": ["C++20 native types"],
+      "automation": "CMake/C++ library for native plugin development",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "redscript",
+      "name": "redscript",
+      "category": "script_compiler",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/jac3km4/redscript",
+      "formats": ["*.reds", "r6/scripts/**/*.reds"],
+      "automation": "Compiler/decompiler CLI and script project",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "tweakxl",
+      "name": "TweakXL",
+      "category": "tweakdb_mod",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/psiberx/cp2077-tweak-xl",
+      "formats": ["*.yaml", "*.yml", "r6/tweaks/**/*.yaml"],
+      "automation": "TweakDB YAML runtime and local text editing",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "archivexl",
+      "name": "ArchiveXL",
+      "category": "resource_conflict_framework",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/psiberx/cp2077-archive-xl",
+      "formats": ["*.xl", "*.yaml", "*.archive", "*.meshes", "*.xbm"],
+      "automation": "Runtime resource extensions; WolvenKit project assets",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "codeware",
+      "name": "Codeware",
+      "category": "script_library",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/psiberx/cp2077-codeware",
+      "formats": ["*.reds", "*.lua", "redscript libraries"],
+      "automation": "REDscript/CET shared mod framework",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "mod-settings",
+      "name": "Mod Settings",
+      "category": "settings_library",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/jackhumbert/mod_settings",
+      "formats": ["*.reds", "*.lua", "*.json"],
+      "automation": "Shared in-game settings framework",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "cyberpunk-blender",
+      "name": "Cyberpunk Blender Add-on",
+      "category": "model_asset_pipeline",
+      "status": "active",
+      "license": "Unspecified",
+      "repository": "https://github.com/WolvenKit/Cyberpunk-Blender-add-on",
+      "formats": [".blend", ".glb", ".gltf", ".fbx", ".obj", ".mesh", ".xbm"],
+      "automation": "Blender Python add-on; batch scripts can use Blender headless",
+      "platform": ["windows", "linux"]
+    },
+    {
+      "id": "wwise",
+      "name": "Wwise / Audiokinetic",
+      "category": "audio_pipeline",
+      "status": "active",
+      "license": "Audiokinetic terms",
+      "repository": "https://www.audiokinetic.com/",
+      "formats": [".wem", ".bnk", ".pck", ".wav", ".ogg"],
+      "automation": "Wwise authoring/project editing; vgmstream/FFmpeg for inspection/conversion",
+      "platform": ["windows", "linux-authoring-limited"]
+    },
+    {
+      "id": "vgmstream",
+      "name": "vgmstream",
+      "category": "audio_inspection",
+      "status": "active",
+      "license": "Multiple open licenses",
+      "repository": "https://github.com/vgmstream/vgmstream",
+      "formats": [".wem", ".bnk", ".pck", "game-specific streams"],
+      "automation": "vgmstream-cli batch audio extraction/playback",
+      "platform": ["windows", "linux"]
+    },
+    {
+      "id": "ffmpeg",
+      "name": "FFmpeg",
+      "category": "media_pipeline",
+      "status": "active",
+      "license": "GPL/LGPL depending build",
+      "repository": "https://ffmpeg.org/",
+      "formats": [".wav", ".ogg", ".mp3", ".flac", ".mp4", ".webm", ".mkv", ".png", ".jpg"],
+      "automation": "ffmpeg/ffprobe CLI",
+      "platform": ["windows", "linux"]
+    },
+    {
+      "id": "audioweaver",
+      "name": "Audio Weaver / Audiokinetic WEM pipeline",
+      "category": "audio_pipeline",
+      "status": "external-tooling",
+      "license": "Vendor-dependent",
+      "repository": "https://www.nexusmods.com/cyberpunk2077/mods/12001",
+      "formats": [".wem", ".bnk", ".wem.xml", ".pck", ".wav"],
+      "automation": "Detect in mod packages; convert and package through available Wwise/vgmstream/WolvenKit tools",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "ink",
+      "name": "Cyberpunk UI / Inkle/ink widget assets",
+      "category": "ui_pipeline",
+      "status": "active",
+      "license": "Vendor/project-specific",
+      "repository": "https://wiki.redmodding.org/cyberpunk-2077-modding",
+      "formats": [".inkatlas", ".inkwidget", ".inkanim", ".inkhud", ".json"],
+      "automation": "WolvenKit conversion plus exact text/JSON editing",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "cet-kit",
+      "name": "CET Kit",
+      "category": "lua_library",
+      "status": "active",
+      "license": "MIT",
+      "repository": "https://github.com/psiberx/cp2077-cet-kit",
+      "formats": ["*.lua", "CET modules"],
+      "automation": "Local Lua modules and reusable CET examples",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "equipment-ex",
+      "name": "Equipment-EX",
+      "category": "wardrobe_framework",
+      "status": "active",
+      "license": "Community/Project-specific",
+      "repository": "https://wiki.redmodding.org/cyberpunk-2077-modding/",
+      "formats": ["*.reds", "*.lua", "*.yaml", "*.xl", "wardrobe entries"],
+      "automation": "Detect project assets and shared inventory/wardrobe dependencies",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "redmod",
+      "name": "REDmod",
+      "category": "official_mod_format",
+      "status": "active",
+      "license": "Game platform feature",
+      "repository": "https://www.cyberpunk.net/",
+      "formats": ["*.reds", "*.yaml", "mod/info.json", "archive/pc/mod"],
+      "automation": "REDmod deployment and local manifest validation",
+      "platform": ["windows", "linux-wine"]
+    },
+    {
+      "id": "cybercmd",
+      "name": "CyberCMD",
+      "category": "in_game_console",
+      "status": "active",
+      "license": "Project-specific",
+      "repository": "https://wiki.redmodding.org/cyberpunk-2077-modding/",
+      "formats": ["*.lua", "*.reds", "console commands"],
+      "automation": "CET/Lua command modules and text configuration",
+      "platform": ["windows", "linux-wine"]
+    }
+  ]
+}

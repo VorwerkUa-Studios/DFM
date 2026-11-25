@@ -18,6 +18,37 @@
 
 Decod функціонує як незалежний **Model Context Protocol (MCP)** сервер через `stdio` (JSON-RPC 2.0) для підключення до **[Mnemosyne](https://github.com/VorwerkUa2/Mnemosyne)** та **Claude Code CLI**.
 
+### Cyberpunk 2077 / REDengine
+
+Для модингу Cyberpunk 2077 доступні окремі MCP/CLI команди:
+
+- `detect_cp2077_install` / `python decod.py cp2077-detect "<game_root>"` — визначає гру, `.archive`, CET і RED4ext.
+- `list_cp2077_mods` / `python decod.py cp2077-mods "<game_root>"` — інвентаризує archive, CET, redscript і TweakXL моди.
+- `inspect_cp2077_archive` / `python decod.py cp2077-inspect-archive "<file.archive>"` — перевіряє архів і наявність WolvenKit CLI.
+- `run_wolvenkit_cli` / `python decod.py cp2077-wolvenkit --help` — передає аргументи у локальний WolvenKit CLI.
+- `scaffold_cp2077_mod` / `python decod.py cp2077-scaffold-mod "<output>" "<mod_name>" cet` — створює CET, redscript, TweakXL або archive-шаблон.
+- `patch_cp2077_text_file` — точна заміна тексту в Lua/redscript/YAML/JSON з автоматичним `.bak`.
+
+Шлях до WolvenKit задається аргументом MCP `wolvenkit_cli` або змінною середовища `DECOD_WOLVENKIT_CLI`.
+
+### Кросплатформний профіль
+
+- Текстові формати (`.lua`, `.reds`, `.yaml`, `.json`, `.xl`) редагуються однаково на Windows і Linux.
+- `.wem`, `.wav`, `.bnk`, `.mp4` обробляються через FFmpeg/vgmstream на обох платформах.
+- Blender-моделі обробляються через Blender CLI/add-on на Windows і Linux.
+- WolvenKit `.dll` запускається через native `dotnet`.
+- Windows `.exe` WolvenKit запускається через `wine` лише на Linux; якщо Wine немає, Decod повертає точну помилку без помилкового успіху.
+- Native runtime гри, CET, RED4ext та Wwise authoring залишаються Windows/Wine-сумісними профілями.
+
+```powershell
+python decod.py cp2077-platform-status
+```
+
+### Каталог бібліотек Cyberpunk 2077
+
+- `get_cp2077_ecosystem` / `python decod.py cp2077-libraries` — список інструментів для archive, Lua/CET, RED4ext, redscript, TweakXL, ArchiveXL, Codeware, Blender, Wwise, FFmpeg та UI assets.
+- `inspect_cp2077_project` / `python decod.py cp2077-inspect-project "<folder>"` — визначає формат мод-проєкту й потрібні залежності за файлами.
+
 ### ⚡ Швидке встановлення залежностей
 
 Запустіть універсальний інсталятор у терміналі папки Decod:

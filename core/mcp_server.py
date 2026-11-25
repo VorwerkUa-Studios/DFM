@@ -42,6 +42,19 @@ from tools.vault.offset_vault import add_offset, list_offsets, get_offset, delet
 from engines.ue5.ue4ss_helper import check_ue4ss, scaffold_mod, scaffold_map_editor, list_mods, enable_mod
 from engines.ue5.world_converter import WorldConverter
 from engines.ue5.cue4parse_helper import scan_ue_iostore_assets
+from engines.redengine.cp2077_helper import (
+    detect_cp2077,
+    inventory_cp2077_mods,
+    inspect_cp2077_archive,
+    run_wolvenkit_cli,
+    scaffold_cp2077_mod,
+    patch_cp2077_text_file,
+    get_cp2077_ecosystem,
+    inspect_cp2077_project,
+    get_cp2077_platform_status,
+    check_cp2077_mod_compatibility,
+    analyze_cp2077_logs,
+)
 from engines.assets.audio_helper import compose_midi
 from tools.code.code_analyzer import inspect_code_structure, extract_function_definition, check_code_diagnostics, run_git_summary
 from tools.security.strix_pentester import run_situational_security_audit, check_strix_status
@@ -312,13 +325,137 @@ TOOLS = [
     },
     {
         "name": "detect_game_engine",
-        "description": "Scan a game directory to automatically detect its engine (Unreal Engine 4/5, Unity Mono/IL2CPP, Godot, Valve Source, EA Maxis DBPF).",
+        "description": "Scan a game directory to automatically detect its engine (Cyberpunk 2077 REDengine, Unreal Engine 4/5, Unity Mono/IL2CPP, Godot, Valve Source, EA Maxis DBPF).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "game_dir": {"type": "string", "description": "Path to the target game directory."}
             },
             "required": ["game_dir"]
+        }
+    },
+    {
+        "name": "detect_cp2077_install",
+        "description": "Inspect a Cyberpunk 2077 installation, archive layout, executable, mod folders, CET, and RED4ext status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_dir": {"type": "string", "description": "Cyberpunk 2077 game root or executable path."}
+            },
+            "required": ["game_dir"]
+        }
+    },
+    {
+        "name": "list_cp2077_mods",
+        "description": "Inventory archive, CET, RED4ext, redscript, and TweakXL mods in a Cyberpunk 2077 installation.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "game_dir": {"type": "string", "description": "Cyberpunk 2077 game root."}
+            },
+            "required": ["game_dir"]
+        }
+    },
+    {
+        "name": "inspect_cp2077_archive",
+        "description": "Inspect a Cyberpunk 2077 .archive file and report size/header plus available WolvenKit CLI.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "archive_path": {"type": "string", "description": "Path to a .archive file."}
+            },
+            "required": ["archive_path"]
+        }
+    },
+    {
+        "name": "run_wolvenkit_cli",
+        "description": "Run WolvenKit.CLI.exe with explicit arguments for archive, CR2W, or asset operations.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "arguments": {"type": "array", "items": {"type": "string"}, "description": "CLI arguments (for example: --help)."},
+                "wolvenkit_cli": {"type": "string", "description": "Optional explicit WolvenKit.CLI.exe path."}
+            },
+            "required": ["arguments"]
+        }
+    },
+    {
+        "name": "scaffold_cp2077_mod",
+        "description": "Create a Cyberpunk 2077 mod scaffold for CET Lua, redscript, TweakXL, or archive mods.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "output_dir": {"type": "string", "description": "Parent directory for generated mod."},
+                "mod_name": {"type": "string", "description": "Mod name."},
+                "mod_type": {"type": "string", "enum": ["cet", "redscript", "tweakxl", "archive"], "description": "Mod format."},
+                "description": {"type": "string", "description": "Optional mod description."}
+            },
+            "required": ["output_dir", "mod_name", "mod_type"]
+        }
+    },
+    {
+        "name": "patch_cp2077_text_file",
+        "description": "Apply exact text replacements to a Cyberpunk 2077 mod file, with an optional timestamped backup.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Lua, redscript, YAML, JSON, or text mod file."},
+                "replacements": {"type": "object", "description": "Exact old-text to new-text mapping.", "additionalProperties": {"type": "string"}},
+                "backup": {"type": "boolean", "description": "Create a .bak copy before writing.", "default": True}
+            },
+            "required": ["file_path", "replacements"]
+        }
+    },
+    {
+        "name": "get_cp2077_ecosystem",
+        "description": "List supported Cyberpunk 2077 mod libraries and tools, optionally filtered by category or text query.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "category": {"type": "string", "description": "Optional category such as archive_asset_tool, lua_runtime, native_extender, script_compiler, audio_pipeline, model_asset_pipeline."},
+                "query": {"type": "string", "description": "Optional substring matched against library metadata."}
+            }
+        }
+    },
+    {
+        "name": "inspect_cp2077_project",
+        "description": "Scan a Cyberpunk 2077 mod project directory and detect WolvenKit, CET, RED4ext, redscript, TweakXL, ArchiveXL, Codeware, Wwise, Blender, and media dependencies.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_dir": {"type": "string", "description": "Mod project or extracted mod directory."}
+            },
+            "required": ["project_dir"]
+        }
+    },
+    {
+        "name": "get_cp2077_platform_status",
+        "description": "Report cross-platform Cyberpunk 2077 tooling availability for Windows, Linux native, .NET, Wine, Blender, FFmpeg, and vgmstream.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "check_cp2077_mod_compatibility",
+        "description": "Scan a Cyberpunk 2077 mod project for declared dependencies, framework evidence, missing runtimes, and duplicate deploy paths.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_dir": {"type": "string", "description": "Mod project or extracted mod directory."}
+            },
+            "required": ["project_dir"]
+        }
+    },
+    {
+        "name": "analyze_cp2077_logs",
+        "description": "Analyze Cyberpunk 2077, redscript, CET, RED4ext, TweakXL, ArchiveXL, and DLL logs for actionable compatibility findings.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "log_path": {"type": "string", "description": "Path to a game or mod log text file."}
+            },
+            "required": ["log_path"]
         }
     },
     {
@@ -949,6 +1086,54 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
         elif name == "detect_game_engine":
             return detect_engine(args["game_dir"])
+
+        elif name == "detect_cp2077_install":
+            return detect_cp2077(args["game_dir"])
+
+        elif name == "list_cp2077_mods":
+            return inventory_cp2077_mods(args["game_dir"])
+
+        elif name == "inspect_cp2077_archive":
+            return inspect_cp2077_archive(args["archive_path"])
+
+        elif name == "run_wolvenkit_cli":
+            return run_wolvenkit_cli(
+                args["arguments"],
+                wolvenkit_cli=args.get("wolvenkit_cli", ""),
+            )
+
+        elif name == "scaffold_cp2077_mod":
+            return scaffold_cp2077_mod(
+                args["output_dir"],
+                args["mod_name"],
+                args["mod_type"],
+                args.get("description", ""),
+            )
+
+        elif name == "patch_cp2077_text_file":
+            return patch_cp2077_text_file(
+                args["file_path"],
+                args["replacements"],
+                backup=bool(args.get("backup", True)),
+            )
+
+        elif name == "get_cp2077_ecosystem":
+            return get_cp2077_ecosystem(
+                category=args.get("category", ""),
+                query=args.get("query", ""),
+            )
+
+        elif name == "inspect_cp2077_project":
+            return inspect_cp2077_project(args["project_dir"])
+
+        elif name == "get_cp2077_platform_status":
+            return get_cp2077_platform_status()
+
+        elif name == "check_cp2077_mod_compatibility":
+            return check_cp2077_mod_compatibility(args["project_dir"])
+
+        elif name == "analyze_cp2077_logs":
+            return analyze_cp2077_logs(args["log_path"])
 
         elif name == "unpack_ue_pak":
             return ue_helper.unpack_pak(args["pak_path"], args["output_dir"], args.get("aes_key"))

@@ -123,6 +123,24 @@ def check_status() -> Dict[str, Any]:
     dotnet_path = shutil.which("dotnet")
     oodle_path = os.path.join(BIN_DIR, "oo2core_9_win64.dll")
 
+    wolvenkit_path = os.path.join(BIN_DIR, "WolvenKit.CLI.exe")
+    if not os.path.exists(wolvenkit_path):
+        wolvenkit_path = os.path.join(COMPONENTS_DIR, "WolvenKit", "WolvenKit.CLI.exe")
+    wolvenkit_status = os.path.exists(wolvenkit_path)
+    if not wolvenkit_status:
+        wolvenkit_dotnet = os.path.join(COMPONENTS_DIR, "WolvenKit", "WolvenKit.CLI.dll")
+        wolvenkit_status = os.path.exists(wolvenkit_dotnet)
+        if wolvenkit_status:
+            wolvenkit_path = wolvenkit_dotnet
+
+    linux_runtime_status = {
+        "wine": shutil.which("wine") is not None,
+        "dotnet": dotnet_path is not None,
+        "blender": shutil.which("blender") is not None,
+        "ffmpeg": shutil.which("ffmpeg") is not None,
+        "vgmstream": shutil.which("vgmstream-cli") is not None or shutil.which("vgmstream") is not None,
+    }
+
     # 4. Linux stealth library
     libstealth_path = os.path.join(BASE_DIR, "stealth", "linux", "libstealth.so")
     stealth_status = os.path.exists(libstealth_path) if platform.system() != "Windows" else True
@@ -166,6 +184,15 @@ def check_status() -> Dict[str, Any]:
                     "dotnet": dotnet_path,
                     "project": cue4parse_project,
                     "oodle_dll": oodle_path if os.path.exists(oodle_path) else None,
+                }
+            },
+            "wolvenkit_cli": {
+                "name": "WolvenKit CLI for Cyberpunk 2077 archive and CR2W tooling",
+                "installed": wolvenkit_status,
+                "details": {
+                    "executable": wolvenkit_path,
+                    "environment_override": "DECOD_WOLVENKIT_CLI",
+                    "cross_platform_runtimes": linux_runtime_status,
                 }
             },
             "media_tools": {

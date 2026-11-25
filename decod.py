@@ -21,6 +21,19 @@ from tools.decompiler.dll_analyzer import DLLAnalyzer
 from engines.detector import detect_engine
 from engines.ue5.world_converter import WorldConverter
 from engines.ue5.cue4parse_helper import scan_ue_iostore_assets
+from engines.redengine.cp2077_helper import (
+    detect_cp2077,
+    inventory_cp2077_mods,
+    inspect_cp2077_archive,
+    run_wolvenkit_cli,
+    scaffold_cp2077_mod,
+    patch_cp2077_text_file,
+    get_cp2077_ecosystem,
+    inspect_cp2077_project,
+    get_cp2077_platform_status,
+    check_cp2077_mod_compatibility,
+    analyze_cp2077_logs,
+)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -97,6 +110,45 @@ def main():
     p_modpack.add_argument("modpack_instance", help="GummerCraft instance/minecraft directory")
     p_modpack.add_argument("output", help="Path for the export profile JSON")
 
+    p_cp = subparsers.add_parser("cp2077-detect", help="Detect and inventory a Cyberpunk 2077 installation")
+    p_cp.add_argument("game_dir", help="Game root or Cyberpunk2077.exe path")
+
+    p_cpmods = subparsers.add_parser("cp2077-mods", help="Inventory installed Cyberpunk 2077 mods")
+    p_cpmods.add_argument("game_dir", help="Game root")
+
+    p_cpinspect = subparsers.add_parser("cp2077-inspect-archive", help="Inspect a Cyberpunk 2077 archive")
+    p_cpinspect.add_argument("archive_path", help="Path to .archive")
+
+    p_cpcli = subparsers.add_parser("cp2077-wolvenkit", help="Run WolvenKit.CLI with explicit arguments")
+    p_cpcli.add_argument("arguments", nargs=argparse.REMAINDER, help="Arguments passed directly to WolvenKit.CLI")
+    p_cpcli.add_argument("--cli", dest="cli_path", default="", help="Explicit WolvenKit.CLI.exe path")
+
+    p_cpscaffold = subparsers.add_parser("cp2077-scaffold-mod", help="Scaffold a Cyberpunk 2077 mod")
+    p_cpscaffold.add_argument("output_dir", help="Parent output directory")
+    p_cpscaffold.add_argument("mod_name", help="Mod name")
+    p_cpscaffold.add_argument("mod_type", choices=["cet", "redscript", "tweakxl", "archive"])
+    p_cpscaffold.add_argument("--description", default="")
+
+    p_cppatch = subparsers.add_parser("cp2077-patch-text", help="Apply exact text replacements to a mod file")
+    p_cppatch.add_argument("file_path", help="Mod text file")
+    p_cppatch.add_argument("replacements_json", help="JSON object mapping old text to new text")
+    p_cppatch.add_argument("--no-backup", action="store_true")
+
+    p_cplibs = subparsers.add_parser("cp2077-libraries", help="List supported Cyberpunk 2077 libraries and toolchains")
+    p_cplibs.add_argument("--category", default="")
+    p_cplibs.add_argument("--query", default="")
+
+    p_cpproject = subparsers.add_parser("cp2077-inspect-project", help="Detect libraries and formats used by a CP2077 mod project")
+    p_cpproject.add_argument("project_dir", help="Mod project or extracted mod directory")
+
+    subparsers.add_parser("cp2077-platform-status", help="Report Windows/Linux native and Wine CP2077 tool availability")
+
+    p_cpcheck = subparsers.add_parser("cp2077-check-compatibility", help="Check mod dependencies and duplicate deploy paths")
+    p_cpcheck.add_argument("project_dir", help="Mod project or extracted mod directory")
+
+    p_cplog = subparsers.add_parser("cp2077-analyze-log", help="Analyze CP2077 and mod framework log errors")
+    p_cplog.add_argument("log_path", help="Path to game or mod log")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -133,6 +185,40 @@ def main():
             args.output,
         )
         print(json.dumps(res, indent=2))
+
+    elif args.command == "cp2077-detect":
+        print(json.dumps(detect_cp2077(args.game_dir), indent=2))
+
+    elif args.command == "cp2077-mods":
+        print(json.dumps(inventory_cp2077_mods(args.game_dir), indent=2))
+
+    elif args.command == "cp2077-inspect-archive":
+        print(json.dumps(inspect_cp2077_archive(args.archive_path), indent=2))
+
+    elif args.command == "cp2077-wolvenkit":
+        print(json.dumps(run_wolvenkit_cli(args.arguments, args.cli_path), indent=2))
+
+    elif args.command == "cp2077-scaffold-mod":
+        print(json.dumps(scaffold_cp2077_mod(args.output_dir, args.mod_name, args.mod_type, args.description), indent=2))
+
+    elif args.command == "cp2077-patch-text":
+        replacements = json.loads(args.replacements_json)
+        print(json.dumps(patch_cp2077_text_file(args.file_path, replacements, backup=not args.no_backup), indent=2))
+
+    elif args.command == "cp2077-libraries":
+        print(json.dumps(get_cp2077_ecosystem(args.category, args.query), indent=2))
+
+    elif args.command == "cp2077-inspect-project":
+        print(json.dumps(inspect_cp2077_project(args.project_dir), indent=2))
+
+    elif args.command == "cp2077-platform-status":
+        print(json.dumps(get_cp2077_platform_status(), indent=2))
+
+    elif args.command == "cp2077-check-compatibility":
+        print(json.dumps(check_cp2077_mod_compatibility(args.project_dir), indent=2))
+
+    elif args.command == "cp2077-analyze-log":
+        print(json.dumps(analyze_cp2077_logs(args.log_path), indent=2))
 
     elif args.command == "landscape-heightmap-export":
         res = WorldConverter.export_landscape_heightmap_from_probe(

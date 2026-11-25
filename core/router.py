@@ -15,7 +15,9 @@ PROFILES = {
             "reverse", "decompile", "disassemble", "ghidra", "x64dbg", "frida", "hook",
             "dump", "lief", "memory", "ptrace", "spore", "package", "dbpf", "offset",
             "stalker", "ue5", "pak", "dumper", "iostore", "stealth", "unity", "godot",
-            "pck", "vpk", "source", "il2cpp", "mono", "assembly-csharp", "detect_engine"
+            "pck", "vpk", "source", "il2cpp", "mono", "assembly-csharp", "detect_engine",
+            "cyberpunk", "2077", "redengine", "redscript", "tweakxl", "wolvenkit", "cet",
+            "cyber_engine_tweaks", "red4ext"
         ],
         "mcp_tools": [
             "detect_game_engine",

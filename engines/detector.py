@@ -25,6 +25,29 @@ def detect_engine(game_dir: str) -> Dict[str, Any]:
     if exes:
         result["executable"] = os.path.abspath(exes[0])
 
+    # Cyberpunk 2077 / REDengine 4
+    cyberpunk_exe = (
+        glob.glob(os.path.join(game_dir, "Cyberpunk2077.exe"))
+        + glob.glob(os.path.join(game_dir, "bin", "x64", "Cyberpunk2077.exe"))
+        + glob.glob(os.path.join(game_dir, "bin", "x64", "*Cyberpunk*2077*.exe"))
+    )
+    red_archive_dirs = glob.glob(os.path.join(game_dir, "**", "*.archive"), recursive=True)
+    red_archive_root = glob.glob(os.path.join(game_dir, "archive", "pc", "content", "*.archive"))
+    if cyberpunk_exe or red_archive_root or (
+        red_archive_dirs
+        and (
+            os.path.isdir(os.path.join(game_dir, "r6"))
+            or os.path.isdir(os.path.join(game_dir, "engine"))
+            or os.path.isdir(os.path.join(game_dir, "bin"))
+        )
+    ):
+        result["engine"] = "redengine"
+        result["flavor"] = "REDengine 4 (Cyberpunk 2077)"
+        result["executable"] = os.path.abspath(cyberpunk_exe[0]) if cyberpunk_exe else None
+        result["main_assets"] = red_archive_dirs[:20]
+        result["description"] = "Cyberpunk 2077 REDengine 4 archive/modding installation."
+        return result
+
     # 1. Check for Unreal Engine (UE4 / UE5)
     pak_files = glob.glob(os.path.join(game_dir, "**", "*.pak"), recursive=True)
     utoc_files = glob.glob(os.path.join(game_dir, "**", "*.utoc"), recursive=True)
