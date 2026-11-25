@@ -31,6 +31,12 @@ Decod функціонує як незалежний **Model Context Protocol (M
 
 Шлях до WolvenKit задається аргументом MCP `wolvenkit_cli` або змінною середовища `DECOD_WOLVENKIT_CLI`.
 
+### Перевірка мод-проєктів та логів
+
+- `check_cp2077_mod_compatibility` / `python decod.py cp2077-check-compatibility "<project>"` перевіряє залежності, дубльовані відносні шляхи та готовність до розгортання.
+- `analyze_cp2077_logs` / `python decod.py cp2077-analyze-log "<log_path>"` знаходить типові помилки REDscript, CET, RED4ext, TweakXL, ArchiveXL, native DLL та archive-завантаження.
+- Каталог тепер включає CET Kit, Equipment-EX, Mod Settings, REDmod, CyberCMD та додаткові audio/model/UI toolchains.
+
 ### Кросплатформний профіль
 
 - Текстові формати (`.lua`, `.reds`, `.yaml`, `.json`, `.xl`) редагуються однаково на Windows і Linux.

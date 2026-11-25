@@ -10,6 +10,8 @@ from engines.redengine.cp2077_helper import (
     get_cp2077_ecosystem,
     inspect_cp2077_project,
     get_cp2077_platform_status,
+    check_cp2077_mod_compatibility,
+    analyze_cp2077_logs,
 )
 
 
@@ -62,6 +64,25 @@ def test_cp2077_helper():
         platform_status = get_cp2077_platform_status()
         assert platform_status["platform"] in {"windows", "linux"}
         assert "tools" in platform_status
+
+        (project / "README.txt").write_text(
+            "Requires TweakXL and ArchiveXL.\n",
+            encoding="utf-8",
+        )
+        compatibility = check_cp2077_mod_compatibility(str(project))
+        assert compatibility["status"] == "ok"
+        assert "tweakxl" in compatibility["declared_dependencies"]
+
+        log = root / "game.log"
+        log.write_text(
+            "REDscript compilation failed\n"
+            "RED4ext version.dll load failed\n"
+            "ArchiveXL asset conflict detected\n",
+            encoding="utf-8",
+        )
+        log_analysis = analyze_cp2077_logs(str(log))
+        codes = {finding["code"] for finding in log_analysis["findings"]}
+        assert {"redscript_compile_failed", "red4ext_missing", "archivexl_error"}.issubset(codes)
 
 
 if __name__ == "__main__":
