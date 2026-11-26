@@ -200,7 +200,7 @@ class ASTDecompiler:
         prev_mnem, prev_ops = instructions[-2][1], instructions[-2][2]
         for k in range(len(instructions) - 2, -1, -1):
             m = instructions[k][1]
-            if m in ['cmp', 'test', 'sub', 'add', 'and', 'or', 'xor']:
+            if m in ['cmp', 'test', 'sub', 'add', 'and', 'or', 'xor', 'dec', 'inc', 'neg']:
                 prev_mnem, prev_ops = m, instructions[k][2]
                 break
             if m in ['call', 'ret', 'retn', 'jmp']:
@@ -217,18 +217,34 @@ class ASTDecompiler:
         }
         op, inv_op = cond_map.get(last_mnem, ('!= 0', '== 0'))
 
-        if prev_mnem == 'cmp':
+        if prev_mnem in ['cmp', 'sub']:
             parts = [p.strip() for p in prev_ops.split(',', 1)]
             if len(parts) == 2:
                 left = self._lift_operand(parts[0])
                 right = self._lift_operand(parts[1])
                 return f"{left} {op} {right}", f"{left} {inv_op} {right}"
-        elif prev_mnem == 'test':
+        elif prev_mnem in ['dec', 'inc', 'neg']:
+            target = self._lift_operand(prev_ops.strip())
+            if last_mnem in ['je', 'jz']:
+                return f"{target} == 0", f"{target} != 0"
+            elif last_mnem in ['jne', 'jnz']:
+                return f"{target} != 0", f"{target} == 0"
+            elif last_mnem in ['jg', 'ja']:
+                return f"{target} > 0", f"{target} <= 0"
+            elif last_mnem in ['jge', 'jae', 'jns']:
+                return f"{target} >= 0", f"{target} < 0"
+            elif last_mnem in ['jl', 'jb', 'js']:
+                return f"{target} < 0", f"{target} >= 0"
+            elif last_mnem in ['jle', 'jbe']:
+                return f"{target} <= 0", f"{target} > 0"
+            else:
+                return f"{target} {op} 0", f"{target} {inv_op} 0"
+        elif prev_mnem in ['test', 'and', 'or', 'xor']:
             parts = [p.strip() for p in prev_ops.split(',', 1)]
             if len(parts) == 2:
                 left = self._lift_operand(parts[0])
                 right = self._lift_operand(parts[1])
-                if parts[0] == parts[1]:
+                if parts[0] == parts[1] or right == '0':
                     if last_mnem in ['je', 'jz']:
                         return f"!{left}", f"{left} != 0"
                     elif last_mnem in ['jne', 'jnz']:
@@ -240,16 +256,17 @@ class ASTDecompiler:
                     else:
                         return f"{left} {op} 0", f"{left} {inv_op} 0"
                 else:
+                    bit_op = '&' if prev_mnem in ['test', 'and'] else ('|' if prev_mnem == 'or' else '^')
                     if last_mnem in ['je', 'jz']:
-                        return f"({left} & {right}) == 0", f"({left} & {right}) != 0"
+                        return f"({left} {bit_op} {right}) == 0", f"({left} {bit_op} {right}) != 0"
                     elif last_mnem in ['jne', 'jnz']:
-                        return f"({left} & {right}) != 0", f"({left} & {right}) == 0"
+                        return f"({left} {bit_op} {right}) != 0", f"({left} {bit_op} {right}) == 0"
                     elif last_mnem in ['js']:
-                        return f"((int64_t)({left} & {right})) < 0", f"((int64_t)({left} & {right})) >= 0"
+                        return f"((int64_t)({left} {bit_op} {right})) < 0", f"((int64_t)({left} {bit_op} {right})) >= 0"
                     elif last_mnem in ['jns']:
-                        return f"((int64_t)({left} & {right})) >= 0", f"((int64_t)({left} & {right})) < 0"
+                        return f"((int64_t)({left} {bit_op} {right})) >= 0", f"((int64_t)({left} {bit_op} {right})) < 0"
                     else:
-                        return f"({left} & {right}) {op} 0", f"({left} & {right}) {inv_op} 0"
+                        return f"({left} {bit_op} {right}) {op} 0", f"({left} {bit_op} {right}) {inv_op} 0"
 
         # Safe fallback based on jump mnemonic
         if last_mnem in ['je', 'jz']:

@@ -23,7 +23,19 @@ from tools.decompiler.semantic_lifter import SemanticLifter
 from tools.decompiler.domain_clusterer import DomainClusterer
 
 MASTER_TYPES_HEADER = """#pragma once
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <dlfcn.h>
+#include <unistd.h>
+#include <pthread.h>
+#define InterlockedIncrement(x) __sync_add_and_fetch((x), 1)
+#define InterlockedDecrement(x) __sync_sub_and_fetch((x), 1)
+#define InterlockedExchange(target, val) __sync_lock_test_and_set((target), (val))
+#define EXCEPTION_EXECUTE_HANDLER 1
+#define __try if (true)
+#define __except(x) else
+#endif
 #include <cstdint>
 #include <cmath>
 #include <string>
