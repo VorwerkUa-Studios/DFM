@@ -171,12 +171,13 @@ class ASTDecompiler:
         return None
 
     def _resolve_annotations(self, addr: int, mnem: str, ops: str) -> str:
-        """Resolves RIP-relative string references and IAT function imports."""
+        """Resolves RIP-relative string references, IAT function imports, and canonical global symbols."""
         if "rip +" in ops or "rip -" in ops:
-            m = re.search(r"rip \+ 0x([0-9a-fA-F]+)", ops)
+            m = re.search(r"rip\s*([+-])\s*(0x[0-9a-fA-F]+|[0-9]+)", ops)
             if m:
-                disp = int(m.group(1), 16)
-                target_rva = addr + 7 + disp
+                sign = m.group(1)
+                disp = int(m.group(2), 16) if '0x' in m.group(2).lower() else int(m.group(2))
+                target_rva = (addr + 7 + (disp if sign == '+' else -disp)) & 0xFFFFFFFFFFFFFFFF
                 for str_rva, s in self.known_strings.items():
                     if abs(str_rva - target_rva) <= 8:
                         clean_s = s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
@@ -185,6 +186,9 @@ class ASTDecompiler:
                     return self.known_imports[target_rva]
                 if target_rva in self.known_symbols:
                     return self.known_symbols[target_rva]
+                # Canonical global symbol resolved to true RVA (prevents fictitious duplicate variables, matching IDA Pro 9.0)
+                target_rva_32 = target_rva & 0xFFFFFFFF
+                return f"global_data_0x{target_rva_32:x}"
 
         return ""
 
@@ -425,7 +429,10 @@ class ASTDecompiler:
                 elif mnem == 'lea':
                     dst_c, src_c = self._lift_lea_expression(ops)
                     if annot:
-                        src_c = annot
+                        if annot.startswith('"'):
+                            src_c = annot
+                        else:
+                            src_c = f"(void*)(uintptr_t)&{annot}"
                     stmts.append(f"{dst_c} = {src_c};")
 
                 elif mnem == 'xor':
