@@ -526,6 +526,11 @@ class ASTDecompiler:
                         stmts.append(f"if ({bb.condition}) {{")
                         stmts.append(f"    return (result != 0);")
                         stmts.append(f"}}")
+                    elif target not in blocks and hasattr(self, 'functions') and target in self.functions:
+                        # Direct tail-call recovery
+                        stmts.append(f"if ({bb.condition}) {{")
+                        stmts.append(f"    return fn_sub_{target:06X}(this_or_arg1, arg2, arg3, 0);")
+                        stmts.append(f"}}")
                     else:
                         stmts.append(f"if ({bb.condition}) {{")
                         stmts.append(f"    goto loc_{target:06X};")
@@ -537,6 +542,9 @@ class ASTDecompiler:
                     if target:
                         if target in blocks and (blocks[target].is_exit or (blocks[target].instructions and blocks[target].instructions[-1][1] in ['ret', 'retn'])):
                             stmts.append(f"return (result != 0);")
+                        elif target not in blocks and hasattr(self, 'functions') and target in self.functions:
+                            # Direct tail-call recovery
+                            stmts.append(f"return fn_sub_{target:06X}(this_or_arg1, arg2, arg3, 0);")
                         else:
                             stmts.append(f"goto loc_{target:06X};")
                             referenced_labels.add(target)
